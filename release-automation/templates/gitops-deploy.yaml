@@ -1,0 +1,578 @@
+apiVersion: xl-release/v1
+kind: Templates
+spec:
+
+- template: "GitOps ArgoCD Deployment V2"
+  description: |
+    Deploiement GitOps dynamique via ArgoCD.
+    Scripts charges depuis GitLab au runtime.
+    Compatible sans acces admin DAI.
+
+  # =========================================================
+  # VARIABLES
+  # =========================================================
+  variables:
+
+    # --- Repos de configuration ---
+    - key: automationProject
+      type: xlrelease.StringVariable
+      label: "Repo Automation GitLab"
+      description: "Ex: platform/dai-release-automation"
+      value: "platform/dai-release-automation"
+      showOnReleaseStart: false
+
+    - key: automationRef
+      type: xlrelease.StringVariable
+      label: "Ref Automation"
+      description: "Branche ou tag du repo automation"
+      value: "main"
+      showOnReleaseStart: false
+
+    - key: catalogProject
+      type: xlrelease.StringVariable
+      label: "Repo Catalog GitLab"
+      description: "Ex: platform/deployment-catalog"
+      value: "platform/deployment-catalog"
+      showOnReleaseStart: false
+
+    - key: catalogRef
+      type: xlrelease.StringVariable
+      label: "Ref Catalog"
+      value: "main"
+      showOnReleaseStart: false
+
+    # --- Variables choisies par l'utilisateur ---
+    - key: componentName
+      type: xlrelease.StringVariable
+      label: "Composant a deployer"
+      description: "Sera valide contre components.yaml"
+      required: true
+
+    - key: targetEnvironmentsCsv
+      type: xlrelease.StringVariable
+      label: "Environnements cibles (CSV)"
+      description: "Ex: dev,staging,prod"
+      required: true
+
+    - key: imageTag
+      type: xlrelease.StringVariable
+      label: "Tag de l'image Docker"
+      required: true
+
+    - key: dryRun
+      type: xlrelease.StringVariable
+      label: "Dry Run (true/false)"
+      value: "false"
+
+    # --- Variables calculees internes ---
+    - key: commonLibPy
+      type: xlrelease.StringVariable
+      showOnReleaseStart: false
+
+    - key: taskPy
+      type: xlrelease.StringVariable
+      showOnReleaseStart: false
+
+    - key: componentsYaml
+      type: xlrelease.StringVariable
+      showOnReleaseStart: false
+
+    - key: environmentsYaml
+      type: xlrelease.StringVariable
+      showOnReleaseStart: false
+
+    - key: availableComponentsText
+      type: xlrelease.StringVariable
+      showOnReleaseStart: false
+
+    - key: availableEnvironmentsText
+      type: xlrelease.StringVariable
+      showOnReleaseStart: false
+
+    - key: componentsJson
+      type: xlrelease.StringVariable
+      showOnReleaseStart: false
+
+    - key: environmentsJson
+      type: xlrelease.StringVariable
+      showOnReleaseStart: false
+
+    - key: componentConfigJson
+      type: xlrelease.StringVariable
+      showOnReleaseStart: false
+
+    - key: targetEnvironmentsJson
+      type: xlrelease.StringVariable
+      showOnReleaseStart: false
+
+    - key: selectedEnvConfigsJson
+      type: xlrelease.StringVariable
+      showOnReleaseStart: false
+
+    - key: needsApproval
+      type: xlrelease.StringVariable
+      value: "false"
+      showOnReleaseStart: false
+
+    - key: approvalEnvsJson
+      type: xlrelease.StringVariable
+      showOnReleaseStart: false
+
+    - key: releaseBranch
+      type: xlrelease.StringVariable
+      showOnReleaseStart: false
+
+    - key: mergeRequestIid
+      type: xlrelease.StringVariable
+      showOnReleaseStart: false
+
+    - key: mergeRequestUrl
+      type: xlrelease.StringVariable
+      showOnReleaseStart: false
+
+    - key: gitopsTag
+      type: xlrelease.StringVariable
+      showOnReleaseStart: false
+
+    - key: argocdDeployResultsJson
+      type: xlrelease.StringVariable
+      showOnReleaseStart: false
+
+    - key: waitResultsJson
+      type: xlrelease.StringVariable
+      showOnReleaseStart: false
+
+    - key: allHealthy
+      type: xlrelease.StringVariable
+      value: "false"
+      showOnReleaseStart: false
+
+    - key: performRollback
+      type: xlrelease.StringVariable
+      value: "false"
+      showOnReleaseStart: false
+
+    - key: rollbackTag
+      type: xlrelease.StringVariable
+      showOnReleaseStart: false
+
+    - key: deploymentReport
+      type: xlrelease.StringVariable
+      showOnReleaseStart: false
+
+    - key: overallSuccess
+      type: xlrelease.StringVariable
+      value: "false"
+      showOnReleaseStart: false
+
+    - key: validationWarnings
+      type: xlrelease.StringVariable
+      showOnReleaseStart: false
+
+  # =========================================================
+  # PHASES
+  # =========================================================
+  phases:
+
+    # =========================================================
+    # PHASE 1 — CHARGEMENT
+    # =========================================================
+    - phase: "1 - Chargement du Catalogue"
+      color: "#0099CC"
+
+      tasks:
+
+        - name: "Charger lib.py depuis GitLab"
+          type: gitlab.GetFileContent
+          server: "GitLab Server"
+          project: "${automationProject}"
+          branch: "${automationRef}"
+          filePath: "scripts/common/lib.py"
+          output: "${commonLibPy}"
+
+        - name: "Lire components.yaml"
+          type: gitlab.GetFileContent
+          server: "GitLab Server"
+          project: "${catalogProject}"
+          branch: "${catalogRef}"
+          filePath: "config/components.yaml"
+          output: "${componentsYaml}"
+
+        - name: "Lire environments.yaml"
+          type: gitlab.GetFileContent
+          server: "GitLab Server"
+          project: "${catalogProject}"
+          branch: "${catalogRef}"
+          filePath: "config/environments.yaml"
+          output: "${environmentsYaml}"
+
+        - name: "Charger show_catalog.py"
+          type: gitlab.GetFileContent
+          server: "GitLab Server"
+          project: "${automationProject}"
+          branch: "${automationRef}"
+          filePath: "scripts/tasks/show_catalog.py"
+          output: "${taskPy}"
+
+        - name: "Executer show_catalog"
+          type: xlrelease.ScriptTask
+          script: |
+            import json
+
+            scope = {
+                "releaseVariables": releaseVariables,
+                "configurationApi": configurationApi,
+                "release": release
+            }
+
+            exec(releaseVariables["commonLibPy"], scope)
+            exec(releaseVariables["taskPy"], scope)
+
+            result = scope["run_in_dai"](
+                releaseVariables, configurationApi
+            )
+
+            if result:
+                for key, value in result.items():
+                    if isinstance(value, (dict, list)):
+                        releaseVariables[key] = json.dumps(value)
+                    else:
+                        releaseVariables[key] = value
+
+    # =========================================================
+    # PHASE 2 — SELECTION UTILISATEUR
+    # =========================================================
+    - phase: "2 - Selection Utilisateur"
+      color: "#FF9900"
+
+      tasks:
+
+        - name: "Choisir le composant et les environnements"
+          type: xlrelease.UserInputTask
+          description: |
+            ============================================================
+            COMPOSANTS DISPONIBLES:
+            ${availableComponentsText}
+
+            ENVIRONNEMENTS DISPONIBLES:
+            ${availableEnvironmentsText}
+
+            Saisir:
+            - componentName   : nom exact du composant
+            - targetEnvironmentsCsv : envs separes par virgule
+              Ex: dev,staging ou prod
+            - imageTag        : tag de l image Docker
+            ============================================================
+          variables:
+            - componentName
+            - targetEnvironmentsCsv
+            - imageTag
+
+        - name: "Charger validate_selection.py"
+          type: gitlab.GetFileContent
+          server: "GitLab Server"
+          project: "${automationProject}"
+          branch: "${automationRef}"
+          filePath: "scripts/tasks/validate_selection.py"
+          output: "${taskPy}"
+
+        - name: "Executer validation"
+          type: xlrelease.ScriptTask
+          script: |
+            import json
+
+            scope = {
+                "releaseVariables": releaseVariables,
+                "configurationApi": configurationApi,
+                "release": release
+            }
+
+            exec(releaseVariables["commonLibPy"], scope)
+            exec(releaseVariables["taskPy"], scope)
+
+            result = scope["run_in_dai"](
+                releaseVariables, configurationApi
+            )
+
+            if result:
+                for key, value in result.items():
+                    if isinstance(value, (dict, list)):
+                        releaseVariables[key] = json.dumps(value)
+                    else:
+                        releaseVariables[key] = value
+
+    # =========================================================
+    # PHASE 3 — GITOPS UPDATE
+    # =========================================================
+    - phase: "3 - GitOps Update (GitLab)"
+      color: "#9933CC"
+
+      tasks:
+
+        - name: "Charger build_gitops_update.py"
+          type: gitlab.GetFileContent
+          server: "GitLab Server"
+          project: "${automationProject}"
+          branch: "${automationRef}"
+          filePath: "scripts/tasks/build_gitops_update.py"
+          output: "${taskPy}"
+
+        - name: "Executer gitops update"
+          type: xlrelease.ScriptTask
+          script: |
+            import json
+
+            scope = {
+                "releaseVariables": releaseVariables,
+                "configurationApi": configurationApi,
+                "release": release
+            }
+
+            # Injecter releaseId et owner
+            releaseVariables["releaseId"] = str(release.id)
+            releaseVariables["releaseOwner"] = str(release.owner)
+
+            exec(releaseVariables["commonLibPy"], scope)
+            exec(releaseVariables["taskPy"], scope)
+
+            result = scope["run_in_dai"](
+                releaseVariables, configurationApi
+            )
+
+            if result:
+                for key, value in result.items():
+                    if isinstance(value, (dict, list)):
+                        releaseVariables[key] = json.dumps(value)
+                    else:
+                        releaseVariables[key] = value
+
+    # =========================================================
+    # PHASE 4 — APPROBATION (PROD UNIQUEMENT)
+    # =========================================================
+    - phase: "4 - Approbation"
+      color: "#CC3333"
+
+      tasks:
+
+        - name: "Verification approbation requise"
+          type: xlrelease.ScriptTask
+          script: |
+            needs = releaseVariables.get("needsApproval", "false")
+            approval_envs = releaseVariables.get("approvalEnvsJson", "[]")
+            print("Approbation requise: %s" % needs)
+            print("Environnements: %s" % approval_envs)
+
+        - name: "Approbation pour Production"
+          type: xlrelease.GateTask
+          precondition: "releaseVariables['needsApproval'] == 'true'"
+          description: |
+            Approbation requise avant le deploiement en production.
+
+            Composant   : ${componentName}
+            Version     : ${imageTag}
+            Envs prod   : ${approvalEnvsJson}
+            MR GitLab   : ${mergeRequestUrl}
+
+            Verifier:
+            - Tests staging OK
+            - Plan de rollback pret
+            - Notifications equipe envoyees
+          conditions:
+            - name: "Tests staging valides"
+              checked: false
+            - name: "Plan rollback confirme"
+              checked: false
+            - name: "Equipe notifiee"
+              checked: false
+            - name: "Creneau de deploiement confirme"
+              checked: false
+          team: "Release Managers"
+
+    # =========================================================
+    # PHASE 5 — DEPLOIEMENT ARGOCD
+    # =========================================================
+    - phase: "5 - Deploiement ArgoCD"
+      color: "#00CC66"
+
+      tasks:
+
+        - name: "Charger build_argocd_payload.py"
+          type: gitlab.GetFileContent
+          server: "GitLab Server"
+          project: "${automationProject}"
+          branch: "${automationRef}"
+          filePath: "scripts/tasks/build_argocd_payload.py"
+          output: "${taskPy}"
+
+        - name: "Executer deploiement ArgoCD"
+          type: xlrelease.ScriptTask
+          script: |
+            import json
+
+            scope = {
+                "releaseVariables": releaseVariables,
+                "configurationApi": configurationApi,
+                "release": release
+            }
+
+            releaseVariables["releaseId"] = str(release.id)
+            releaseVariables["releaseOwner"] = str(release.owner)
+
+            exec(releaseVariables["commonLibPy"], scope)
+            exec(releaseVariables["taskPy"], scope)
+
+            result = scope["run_in_dai"](
+                releaseVariables, configurationApi
+            )
+
+            if result:
+                for key, value in result.items():
+                    if isinstance(value, (dict, list)):
+                        releaseVariables[key] = json.dumps(value)
+                    else:
+                        releaseVariables[key] = value
+
+        - name: "Charger wait_sync.py"
+          type: gitlab.GetFileContent
+          server: "GitLab Server"
+          project: "${automationProject}"
+          branch: "${automationRef}"
+          filePath: "scripts/tasks/wait_sync.py"
+          output: "${taskPy}"
+
+        - name: "Attendre synchronisation ArgoCD"
+          type: xlrelease.ScriptTask
+          script: |
+            import json
+
+            scope = {
+                "releaseVariables": releaseVariables,
+                "configurationApi": configurationApi,
+                "release": release
+            }
+
+            exec(releaseVariables["commonLibPy"], scope)
+            exec(releaseVariables["taskPy"], scope)
+
+            result = scope["run_in_dai"](
+                releaseVariables, configurationApi
+            )
+
+            if result:
+                for key, value in result.items():
+                    if isinstance(value, (dict, list)):
+                        releaseVariables[key] = json.dumps(value)
+                    else:
+                        releaseVariables[key] = value
+
+    # =========================================================
+    # PHASE 6 — RAPPORT
+    # =========================================================
+    - phase: "6 - Rapport Final"
+      color: "#666666"
+
+      tasks:
+
+        - name: "Charger report.py"
+          type: gitlab.GetFileContent
+          server: "GitLab Server"
+          project: "${automationProject}"
+          branch: "${automationRef}"
+          filePath: "scripts/tasks/report.py"
+          output: "${taskPy}"
+
+        - name: "Generer le rapport"
+          type: xlrelease.ScriptTask
+          script: |
+            import json
+
+            scope = {
+                "releaseVariables": releaseVariables,
+                "configurationApi": configurationApi,
+                "release": release
+            }
+
+            releaseVariables["releaseId"] = str(release.id)
+            releaseVariables["releaseOwner"] = str(release.owner)
+
+            exec(releaseVariables["commonLibPy"], scope)
+            exec(releaseVariables["taskPy"], scope)
+
+            result = scope["run_in_dai"](
+                releaseVariables, configurationApi
+            )
+
+            if result:
+                for key, value in result.items():
+                    if isinstance(value, (dict, list)):
+                        releaseVariables[key] = json.dumps(value)
+                    else:
+                        releaseVariables[key] = value
+
+        - name: "Verifier succes global"
+          type: xlrelease.ScriptTask
+          script: |
+            success = releaseVariables.get("overallSuccess", "false")
+            report = releaseVariables.get("deploymentReport", "")
+            print(report)
+            if success != "true":
+                raise Exception(
+                    "Le deploiement a echoue. Voir le rapport."
+                )
+
+    # =========================================================
+    # PHASE 7 — ROLLBACK (OPTIONNEL)
+    # =========================================================
+    - phase: "7 - Rollback (si necessaire)"
+      color: "#FF0000"
+
+      tasks:
+
+        - name: "Rollback necessaire?"
+          type: xlrelease.UserInputTask
+          precondition: "releaseVariables['allHealthy'] == 'false'"
+          description: |
+            Le deploiement a rencontre des problemes.
+
+            Rapport:
+            ${deploymentReport}
+
+            Souhaitez-vous effectuer un rollback?
+          variables:
+            - performRollback
+            - rollbackTag
+
+        - name: "Charger rollback.py"
+          type: gitlab.GetFileContent
+          precondition: "releaseVariables['performRollback'] == 'true'"
+          server: "GitLab Server"
+          project: "${automationProject}"
+          branch: "${automationRef}"
+          filePath: "scripts/tasks/rollback.py"
+          output: "${taskPy}"
+
+        - name: "Executer rollback"
+          type: xlrelease.ScriptTask
+          precondition: "releaseVariables['performRollback'] == 'true'"
+          script: |
+            import json
+
+            scope = {
+                "releaseVariables": releaseVariables,
+                "configurationApi": configurationApi,
+                "release": release
+            }
+
+            exec(releaseVariables["commonLibPy"], scope)
+            exec(releaseVariables["taskPy"], scope)
+
+            result = scope["run_in_dai"](
+                releaseVariables, configurationApi
+            )
+
+            if result:
+                for key, value in result.items():
+                    if isinstance(value, (dict, list)):
+                        releaseVariables[key] = json.dumps(value)
+                    else:
+                        releaseVariables[key] = value

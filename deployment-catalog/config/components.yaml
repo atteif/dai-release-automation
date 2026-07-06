@@ -1,0 +1,51 @@
+# Catalogue des composants déployables
+# Repo: platform/deployment-catalog
+# Path: config/components.yaml
+
+components:
+
+  - name: backend-api
+    displayName: "Backend API"
+    description: "Spring Boot REST API"
+    chartPath: "apps/backend-api"
+    gitopsRepoUrl: "https://gitlab.company.com/platform/gitops.git"
+    gitopsRepoBranch: "main"
+    gitopsRepoProject: "platform/gitops"
+    imageRepository: "registry.company.com/backend-api"
+    healthCheckPath: "/actuator/health"
+    healthCheckPort: 8080
+    dependencies: []
+    owners:
+      - "team-backend"
+    slackChannel: "#deploy-backend"
+
+  - name: frontend
+    displayName: "Frontend App"
+    description: "React frontend application"
+    chartPath: "apps/frontend"
+    gitopsRepoUrl: "https://gitlab.company.com/platform/gitops.git"
+    gitopsRepoBranch: "main"
+    gitopsRepoProject: "platform/gitops"
+    imageRepository: "registry.company.com/frontend"
+    healthCheckPath: "/health"
+    healthCheckPort: 3000
+    dependencies: []
+    owners:
+      - "team-frontend"
+    slackChannel: "#deploy-frontend"
+
+  - name: payment-service
+    displayName: "Payment Service"
+    description: "Payment processing microservice"
+    chartPath: "apps/payment-service"
+    gitopsRepoUrl: "https://gitlab.company.com/platform/gitops.git"
+    gitopsRepoBranch: "main"
+    gitopsRepoProject: "platform/gitops"
+    imageRepository: "registry.company.com/payment-service"
+    healthCheckPath: "/health"
+    healthCheckPort: 8081
+    dependencies:
+      - backend-api
+    owners:
+      - "team-payments"
+    slackChannel: "#deploy-payments"
