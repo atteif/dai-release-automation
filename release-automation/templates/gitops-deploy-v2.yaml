@@ -1,0 +1,127 @@
+apiVersion: xl-release/v1
+kind: Templates
+spec:
+- template: "GitOps Starter Compatible"
+  variables:
+  - key: gitlabServer
+    type: xlrelease.StringVariable
+    value: "GitLab Server"
+    showOnReleaseStart: false
+
+  - key: automationProject
+    type: xlrelease.StringVariable
+    value: "platform/dai-release-automation"
+    showOnReleaseStart: false
+
+  - key: automationRef
+    type: xlrelease.StringVariable
+    value: "main"
+    showOnReleaseStart: false
+
+  - key: catalogProject
+    type: xlrelease.StringVariable
+    value: "platform/deployment-catalog"
+    showOnReleaseStart: false
+
+  - key: catalogRef
+    type: xlrelease.StringVariable
+    value: "main"
+    showOnReleaseStart: false
+
+  - key: componentName
+    type: xlrelease.StringVariable
+
+  - key: targetEnvironmentsCsv
+    type: xlrelease.StringVariable
+
+  - key: imageTag
+    type: xlrelease.StringVariable
+
+  - key: dryRun
+    type: xlrelease.StringVariable
+    value: "false"
+
+  - key: componentsYaml
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
+
+  - key: environmentsYaml
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
+
+  phases:
+  - phase: "Test lecture"
+    tasks:
+    - name: "Afficher les inputs"
+      type: xlrelease.ScriptTask
+      script: |
+        print("componentName = %s" % releaseVariables.get("componentName"))
+        print("targetEnvironmentsCsv = %s" % releaseVariables.get("targetEnvironmentsCsv"))
+        print("imageTag = %s" % releaseVariables.get("imageTag"))
+
+    - name: "Lire les catalogues GitLab"
+      type: xlrelease.ScriptTask
+      script: |
+        import json
+        import base64
+        import ssl
+
+        try:
+            from urllib2 import Request, urlopen, HTTPError
+            from urllib import quote
+        except ImportError:
+            from urllib.request import Request, urlopen
+            from urllib.error import HTTPError
+            from urllib.parse import quote
+
+        server_title = releaseVariables.get("gitlabServer", "GitLab Server")
+        servers = configurationApi.searchByTypeAndTitle("gitlab.Server", server_title)
+        if not servers:
+            raise Exception("Serveur GitLab introuvable: %s" % server_title)
+
+        server = servers[0]
+        gitlab_url = server.getProperty("url")
+        gitlab_token = server.getProperty("token")
+
+        ssl_ctx = ssl.create_default_context()
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = ssl.CERT_NONE
+
+        def read_gitlab_file(project, file_path, ref):
+            url = "%s/api/v4/projects/%s/repository/files/%s?ref=%s" % (
+                gitlab_url.rstrip("/"),
+                quote(project, safe=""),
+                quote(file_path, safe=""),
+                quote(ref, safe="")
+            )
+            req = Request(url)
+            req.add_header("PRIVATE-TOKEN", gitlab_token)
+            try:
+                resp = urlopen(req, context=ssl_ctx, timeout=30)
+                data = json.loads(resp.read().decode("utf-8"))
+                content = data.get("content", "")
+                encoding = data.get("encoding", "base64")
+                if encoding == "base64":
+                    return base64.b64decode(content).decode("utf-8")
+                return content
+            except HTTPError as e:
+                body = e.read().decode("utf-8")
+                raise Exception("Erreur GitLab HTTP %s: %s" % (e.code, body))
+
+        components = read_gitlab_file(
+            releaseVariables["catalogProject"],
+            "config/components.yaml",
+            releaseVariables["catalogRef"]
+        )
+
+        environments = read_gitlab_file(
+            releaseVariables["catalogProject"],
+            "config/environments.yaml",
+            releaseVariables["catalogRef"]
+        )
+
+        releaseVariables["componentsYaml"] = components
+        releaseVariables["environmentsYaml"] = environments
+
+        print("components.yaml charge")
+        print("environments.yaml charge")
