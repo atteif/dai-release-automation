@@ -1,0 +1,25 @@
+apiVersion: xl-release/v1
+kind: Templates
+spec:
+- template: "Test Import Minimal"
+  variables:
+  - key: componentName
+    type: xlrelease.StringVariable
+  - key: targetEnvironmentsCsv
+    type: xlrelease.StringVariable
+  - key: imageTag
+    type: xlrelease.StringVariable
+  - key: dryRun
+    type: xlrelease.StringVariable
+    value: "false"
+
+  phases:
+  - phase: "Test"
+    tasks:
+    - name: "Afficher les variables"
+      type: xlrelease.ScriptTask
+      script: |
+        print("componentName = %s" % releaseVariables.get("componentName"))
+        print("targetEnvironmentsCsv = %s" % releaseVariables.get("targetEnvironmentsCsv"))
+        print("imageTag = %s" % releaseVariables.get("imageTag"))
+        print("dryRun = %s" % releaseVariables.get("dryRun"))
