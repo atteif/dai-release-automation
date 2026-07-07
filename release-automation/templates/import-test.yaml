@@ -1,0 +1,13 @@
+apiVersion: xl-release/v1
+kind: Templates
+spec:
+- template: "01 - Import Test"
+  phases:
+  - phase: "Test"
+    tasks:
+    - name: "Hello World"
+      type: xlrelease.ScriptTask
+      script: |
+        print("Import OK !")
+        print("Release ID : %s" % release.id)
+        print("Release owner : %s" % release.owner)

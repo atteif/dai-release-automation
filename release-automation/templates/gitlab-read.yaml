@@ -1,0 +1,462 @@
+apiVersion: xl-release/v1
+kind: Templates
+spec:
+- template: "02 - GitLab Read Test"
+  variables:
+  - key: gitlabServer
+    type: xlrelease.StringVariable
+    value: "GitLab Server"
+    showOnReleaseStart: false
+
+  - key: automationProject
+    type: xlrelease.StringVariable
+    value: "platform/dai-release-automation"
+    showOnReleaseStart: false
+
+  - key: automationRef
+    type: xlrelease.StringVariable
+    value: "main"
+    showOnReleaseStart: false
+
+  - key: catalogProject
+    type: xlrelease.StringVariable
+    value: "platform/deployment-catalog"
+    showOnReleaseStart: false
+
+  - key: catalogRef
+    type: xlrelease.StringVariable
+    value: "main"
+    showOnReleaseStart: false
+
+  - key: componentName
+    type: xlrelease.StringVariable
+
+  - key: targetEnvironmentsCsv
+    type: xlrelease.StringVariable
+
+  - key: imageTag
+    type: xlrelease.StringVariable
+
+  - key: dryRun
+    type: xlrelease.StringVariable
+    value: "false"
+
+  - key: commonLibPy
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
+
+  - key: componentsYaml
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
+
+  - key: environmentsYaml
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
+
+  - key: availableComponentsText
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
+
+  - key: availableEnvironmentsText
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
+
+  - key: componentsJson
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
+
+  - key: environmentsJson
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
+
+  phases:
+
+  # ============================================================
+  # PHASE 1 : Lecture GitLab
+  # ============================================================
+  - phase: "1 - Lecture GitLab"
+    tasks:
+
+    - name: "1.1 - Charger lib.py depuis GitLab"
+      type: xlrelease.ScriptTask
+      script: |
+        import json
+        import base64
+        import ssl
+
+        try:
+            from urllib2 import Request, urlopen, HTTPError
+            from urllib import quote
+        except ImportError:
+            from urllib.request import Request, urlopen
+            from urllib.error import HTTPError
+            from urllib.parse import quote
+
+        # ---- Recuperer config serveur GitLab ----
+        server_title = releaseVariables.get("gitlabServer", "GitLab Server")
+        servers = configurationApi.searchByTypeAndTitle(
+            "gitlab.Server", server_title
+        )
+        if not servers:
+            raise Exception(
+                "Serveur GitLab '%s' non trouve.\n"
+                "Aller dans Settings > Shared Configuration > GitLab" % server_title
+            )
+
+        server       = servers[0]
+        gitlab_url   = server.getProperty("url")
+        gitlab_token = server.getProperty("token")
+
+        print("GitLab URL : %s" % gitlab_url)
+
+        # ---- Contexte SSL ----
+        ssl_ctx = ssl.create_default_context()
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode    = ssl.CERT_NONE
+
+        # ---- Fonction lecture fichier GitLab ----
+        def read_gitlab_file(project, file_path, ref):
+            url = (
+                "%s/api/v4/projects/%s/repository/files/%s?ref=%s" % (
+                    gitlab_url.rstrip("/"),
+                    quote(project,   safe=""),
+                    quote(file_path, safe=""),
+                    quote(ref,       safe="")
+                )
+            )
+            print("  GET %s" % url)
+            req = Request(url)
+            req.add_header("PRIVATE-TOKEN", gitlab_token)
+            try:
+                resp    = urlopen(req, context=ssl_ctx, timeout=30)
+                data    = json.loads(resp.read().decode("utf-8"))
+                content = data.get("content",  "")
+                enc     = data.get("encoding", "base64")
+                if enc == "base64":
+                    return base64.b64decode(content).decode("utf-8")
+                return content
+            except HTTPError as e:
+                body = e.read().decode("utf-8")
+                raise Exception(
+                    "GitLab HTTP %d pour %s : %s" % (e.code, file_path, body)
+                )
+
+        # ---- Lire lib.py ----
+        print("\nLecture lib.py ...")
+        lib = read_gitlab_file(
+            releaseVariables["automationProject"],
+            "scripts/common/lib.py",
+            releaseVariables["automationRef"]
+        )
+        releaseVariables["commonLibPy"] = lib
+        print("lib.py charge : %d octets" % len(lib))
+
+    - name: "1.2 - Lire components.yaml"
+      type: xlrelease.ScriptTask
+      script: |
+        import json
+        import base64
+        import ssl
+
+        try:
+            from urllib2 import Request, urlopen, HTTPError
+            from urllib import quote
+        except ImportError:
+            from urllib.request import Request, urlopen
+            from urllib.error import HTTPError
+            from urllib.parse import quote
+
+        server_title = releaseVariables.get("gitlabServer", "GitLab Server")
+        server       = configurationApi.searchByTypeAndTitle(
+            "gitlab.Server", server_title
+        )[0]
+        gitlab_url   = server.getProperty("url")
+        gitlab_token = server.getProperty("token")
+
+        ssl_ctx = ssl.create_default_context()
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode    = ssl.CERT_NONE
+
+        def read_gitlab_file(project, file_path, ref):
+            url = (
+                "%s/api/v4/projects/%s/repository/files/%s?ref=%s" % (
+                    gitlab_url.rstrip("/"),
+                    quote(project,   safe=""),
+                    quote(file_path, safe=""),
+                    quote(ref,       safe="")
+                )
+            )
+            req = Request(url)
+            req.add_header("PRIVATE-TOKEN", gitlab_token)
+            try:
+                resp    = urlopen(req, context=ssl_ctx, timeout=30)
+                data    = json.loads(resp.read().decode("utf-8"))
+                content = data.get("content",  "")
+                enc     = data.get("encoding", "base64")
+                if enc == "base64":
+                    return base64.b64decode(content).decode("utf-8")
+                return content
+            except HTTPError as e:
+                body = e.read().decode("utf-8")
+                raise Exception(
+                    "GitLab HTTP %d pour %s : %s" % (e.code, file_path, body)
+                )
+
+        print("Lecture components.yaml ...")
+        content = read_gitlab_file(
+            releaseVariables["catalogProject"],
+            "config/components.yaml",
+            releaseVariables["catalogRef"]
+        )
+        releaseVariables["componentsYaml"] = content
+        print("components.yaml charge : %d octets" % len(content))
+        print("")
+        print(content[:500])
+
+    - name: "1.3 - Lire environments.yaml"
+      type: xlrelease.ScriptTask
+      script: |
+        import json
+        import base64
+        import ssl
+
+        try:
+            from urllib2 import Request, urlopen, HTTPError
+            from urllib import quote
+        except ImportError:
+            from urllib.request import Request, urlopen
+            from urllib.error import HTTPError
+            from urllib.parse import quote
+
+        server_title = releaseVariables.get("gitlabServer", "GitLab Server")
+        server       = configurationApi.searchByTypeAndTitle(
+            "gitlab.Server", server_title
+        )[0]
+        gitlab_url   = server.getProperty("url")
+        gitlab_token = server.getProperty("token")
+
+        ssl_ctx = ssl.create_default_context()
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode    = ssl.CERT_NONE
+
+        def read_gitlab_file(project, file_path, ref):
+            url = (
+                "%s/api/v4/projects/%s/repository/files/%s?ref=%s" % (
+                    gitlab_url.rstrip("/"),
+                    quote(project,   safe=""),
+                    quote(file_path, safe=""),
+                    quote(ref,       safe="")
+                )
+            )
+            req = Request(url)
+            req.add_header("PRIVATE-TOKEN", gitlab_token)
+            try:
+                resp    = urlopen(req, context=ssl_ctx, timeout=30)
+                data    = json.loads(resp.read().decode("utf-8"))
+                content = data.get("content",  "")
+                enc     = data.get("encoding", "base64")
+                if enc == "base64":
+                    return base64.b64decode(content).decode("utf-8")
+                return content
+            except HTTPError as e:
+                body = e.read().decode("utf-8")
+                raise Exception(
+                    "GitLab HTTP %d pour %s : %s" % (e.code, file_path, body)
+                )
+
+        print("Lecture environments.yaml ...")
+        content = read_gitlab_file(
+            releaseVariables["catalogProject"],
+            "config/environments.yaml",
+            releaseVariables["catalogRef"]
+        )
+        releaseVariables["environmentsYaml"] = content
+        print("environments.yaml charge : %d octets" % len(content))
+        print("")
+        print(content[:500])
+
+    - name: "1.4 - Executer show_catalog.py"
+      type: xlrelease.ScriptTask
+      script: |
+        import json
+        import base64
+        import ssl
+
+        try:
+            from urllib2 import Request, urlopen, HTTPError
+            from urllib import quote
+        except ImportError:
+            from urllib.request import Request, urlopen
+            from urllib.error import HTTPError
+            from urllib.parse import quote
+
+        server_title = releaseVariables.get("gitlabServer", "GitLab Server")
+        server       = configurationApi.searchByTypeAndTitle(
+            "gitlab.Server", server_title
+        )[0]
+        gitlab_url   = server.getProperty("url")
+        gitlab_token = server.getProperty("token")
+
+        ssl_ctx = ssl.create_default_context()
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode    = ssl.CERT_NONE
+
+        def read_gitlab_file(project, file_path, ref):
+            url = (
+                "%s/api/v4/projects/%s/repository/files/%s?ref=%s" % (
+                    gitlab_url.rstrip("/"),
+                    quote(project,   safe=""),
+                    quote(file_path, safe=""),
+                    quote(ref,       safe="")
+                )
+            )
+            req = Request(url)
+            req.add_header("PRIVATE-TOKEN", gitlab_token)
+            try:
+                resp    = urlopen(req, context=ssl_ctx, timeout=30)
+                data    = json.loads(resp.read().decode("utf-8"))
+                content = data.get("content",  "")
+                enc     = data.get("encoding", "base64")
+                if enc == "base64":
+                    return base64.b64decode(content).decode("utf-8")
+                return content
+            except HTTPError as e:
+                body = e.read().decode("utf-8")
+                raise Exception(
+                    "GitLab HTTP %d pour %s : %s" % (e.code, file_path, body)
+                )
+
+        # ---- Charger le script Python ----
+        task_code = read_gitlab_file(
+            releaseVariables["automationProject"],
+            "scripts/tasks/show_catalog.py",
+            releaseVariables["automationRef"]
+        )
+
+        # ---- Creer le scope d execution ----
+        scope = {
+            "releaseVariables": releaseVariables,
+            "configurationApi": configurationApi,
+            "release":          release
+        }
+
+        # ---- Injecter lib.py dans le scope ----
+        exec(releaseVariables["commonLibPy"], scope)
+
+        # ---- Executer le script ----
+        exec(task_code, scope)
+
+        # ---- Recuperer le resultat ----
+        result = scope["run_in_dai"](releaseVariables, configurationApi)
+        if result:
+            for key, value in result.items():
+                if isinstance(value, (dict, list)):
+                    releaseVariables[key] = json.dumps(value)
+                else:
+                    releaseVariables[key] = ("" if value is None else str(value))
+
+        print("")
+        print("Composants disponibles :")
+        print(releaseVariables.get("availableComponentsText", ""))
+        print("")
+        print("Environnements disponibles :")
+        print(releaseVariables.get("availableEnvironmentsText", ""))
+
+  # ============================================================
+  # PHASE 2 : Saisie utilisateur
+  # ============================================================
+  - phase: "2 - Saisie Utilisateur"
+    tasks:
+
+    - name: "2.1 - Saisir les parametres de deploiement"
+      type: xlrelease.UserInputTask
+      description: |
+        COMPOSANTS DISPONIBLES :
+        ${availableComponentsText}
+
+        ENVIRONNEMENTS DISPONIBLES :
+        ${availableEnvironmentsText}
+
+        Remplir les champs ci-dessous.
+      variables:
+      - componentName
+      - targetEnvironmentsCsv
+      - imageTag
+
+    - name: "2.2 - Valider la selection"
+      type: xlrelease.ScriptTask
+      script: |
+        import json
+        import base64
+        import ssl
+
+        try:
+            from urllib2 import Request, urlopen, HTTPError
+            from urllib import quote
+        except ImportError:
+            from urllib.request import Request, urlopen
+            from urllib.error import HTTPError
+            from urllib.parse import quote
+
+        server_title = releaseVariables.get("gitlabServer", "GitLab Server")
+        server       = configurationApi.searchByTypeAndTitle(
+            "gitlab.Server", server_title
+        )[0]
+        gitlab_url   = server.getProperty("url")
+        gitlab_token = server.getProperty("token")
+
+        ssl_ctx = ssl.create_default_context()
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode    = ssl.CERT_NONE
+
+        def read_gitlab_file(project, file_path, ref):
+            url = (
+                "%s/api/v4/projects/%s/repository/files/%s?ref=%s" % (
+                    gitlab_url.rstrip("/"),
+                    quote(project,   safe=""),
+                    quote(file_path, safe=""),
+                    quote(ref,       safe="")
+                )
+            )
+            req = Request(url)
+            req.add_header("PRIVATE-TOKEN", gitlab_token)
+            try:
+                resp    = urlopen(req, context=ssl_ctx, timeout=30)
+                data    = json.loads(resp.read().decode("utf-8"))
+                content = data.get("content",  "")
+                enc     = data.get("encoding", "base64")
+                if enc == "base64":
+                    return base64.b64decode(content).decode("utf-8")
+                return content
+            except HTTPError as e:
+                body = e.read().decode("utf-8")
+                raise Exception(
+                    "GitLab HTTP %d pour %s : %s" % (e.code, file_path, body)
+                )
+
+        task_code = read_gitlab_file(
+            releaseVariables["automationProject"],
+            "scripts/tasks/validate_selection.py",
+            releaseVariables["automationRef"]
+        )
+
+        scope = {
+            "releaseVariables": releaseVariables,
+            "configurationApi": configurationApi,
+            "release":          release
+        }
+        exec(releaseVariables["commonLibPy"], scope)
+        exec(task_code, scope)
+
+        result = scope["run_in_dai"](releaseVariables, configurationApi)
+        if result:
+            for key, value in result.items():
+                if isinstance(value, (dict, list)):
+                    releaseVariables[key] = json.dumps(value)
+                else:
+                    releaseVariables[key] = ("" if value is None else str(value))
+
+        print("Validation OK")
+        print("Composant : %s" % releaseVariables.get("componentName"))
+        print("Envs      : %s" % releaseVariables.get("targetEnvironmentsJson"))
+        print("Tag       : %s" % releaseVariables.get("imageTag"))
