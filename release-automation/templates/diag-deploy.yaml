@@ -1,0 +1,65 @@
+apiVersion: xl-release/v1
+kind: Templates
+spec:
+- template: "Diagnostic Folder Variables"
+  phases:
+  - phase: "Diagnostic"
+    tasks:
+    - name: "Verifier les variables de folder"
+      type: xlrelease.ScriptTask
+      script: |
+        import sys
+
+        vars_to_check = [
+            "folder.devopstc-gitlab",
+            "folder.devopstc-argocd-NPRD-INST"
+        ]
+
+        for v in vars_to_check:
+            value = releaseVariables.get(v)
+            print("=" * 50)
+            print("Variable : %s" % v)
+
+            if value is None:
+                print("  -> INTROUVABLE / None")
+                print("")
+                continue
+
+            print("  Valeur    : %s" % str(value)[:200])
+            print("  Type Py   : %s" % type(value).__name__)
+
+            try:
+                print("  Type Java : %s" % value.getClass().getName())
+            except:
+                print("  Type Java : N/A")
+
+            try:
+                print("  url       : %s" % value.getProperty("url"))
+            except:
+                print("  url       : N/A via getProperty")
+
+            try:
+                has_token = value.getProperty("token")
+                print("  token     : %s" % ("present" if has_token else "VIDE"))
+            except:
+                print("  token     : N/A via getProperty")
+
+            try:
+                print("  id        : %s" % value.id)
+            except:
+                pass
+
+            try:
+                print("  title     : %s" % value.title)
+            except:
+                pass
+
+            try:
+                methods = [m for m in dir(value) if not m.startswith("_")]
+                print("  Methodes  : %s" % ", ".join(methods[:15]))
+            except:
+                pass
+
+            print("")
+
+        print("Diagnostic termine.")
