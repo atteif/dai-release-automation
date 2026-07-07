@@ -1,7 +1,3 @@
-# Catalogue des composants déployables
-# Repo: platform/deployment-catalog
-# Path: config/components.yaml
-
 components:
 
   - name: backend-api

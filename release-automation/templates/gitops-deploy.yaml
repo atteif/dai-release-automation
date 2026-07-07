@@ -1,1040 +1,866 @@
 apiVersion: xl-release/v1
 kind: Templates
 spec:
-
-- template: "GitOps ArgoCD Deployment V2"
+- template: "GitOps ArgoCD Deployment"
   description: |
     Deploiement GitOps dynamique via ArgoCD.
-    Hybride : plugin GitLab natif + ScriptTask API pour lecture fichiers.
+    Utilise les variables de folder de type Configuration.
 
   variables:
+  - key: gitlabServer
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
 
-    - key: gitlabServer
-      type: xlrelease.StringVariable
-      label: "Nom du serveur GitLab dans DAI"
-      value: "GitLab Server"
-      showOnReleaseStart: false
+  - key: automationProject
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
 
-    - key: automationProject
-      type: xlrelease.StringVariable
-      label: "Repo Automation GitLab"
-      value: "platform/dai-release-automation"
-      showOnReleaseStart: false
+  - key: automationRef
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
 
-    - key: automationRef
-      type: xlrelease.StringVariable
-      label: "Ref Automation"
-      value: "main"
-      showOnReleaseStart: false
+  - key: catalogProject
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
 
-    - key: catalogProject
-      type: xlrelease.StringVariable
-      label: "Repo Catalog GitLab"
-      value: "platform/deployment-catalog"
-      showOnReleaseStart: false
+  - key: catalogRef
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
 
-    - key: catalogRef
-      type: xlrelease.StringVariable
-      label: "Ref Catalog"
-      value: "main"
-      showOnReleaseStart: false
+  - key: argocdDevServer
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
 
-    - key: componentName
-      type: xlrelease.StringVariable
-      label: "Composant a deployer"
+  - key: argocdStagingServer
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
 
-    - key: targetEnvironmentsCsv
-      type: xlrelease.StringVariable
-      label: "Environnements cibles (CSV)"
-      description: "Ex: dev,staging,prod"
+  - key: argocdProdServer
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
 
-    - key: imageTag
-      type: xlrelease.StringVariable
-      label: "Tag de l image Docker"
+  - key: releaseManagersTeam
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
 
-    - key: dryRun
-      type: xlrelease.StringVariable
-      label: "Dry Run (true/false)"
-      value: "false"
+  - key: componentName
+    type: xlrelease.StringVariable
 
-    - key: commonLibPy
-      type: xlrelease.StringVariable
-      showOnReleaseStart: false
+  - key: targetEnvironmentsCsv
+    type: xlrelease.StringVariable
 
-    - key: componentsYaml
-      type: xlrelease.StringVariable
-      showOnReleaseStart: false
+  - key: imageTag
+    type: xlrelease.StringVariable
 
-    - key: environmentsYaml
-      type: xlrelease.StringVariable
-      showOnReleaseStart: false
+  - key: dryRun
+    type: xlrelease.StringVariable
+    value: "false"
 
-    - key: availableComponentsText
-      type: xlrelease.StringVariable
-      showOnReleaseStart: false
+  - key: commonLibPy
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
 
-    - key: availableEnvironmentsText
-      type: xlrelease.StringVariable
-      showOnReleaseStart: false
+  - key: componentsYaml
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
 
-    - key: componentsJson
-      type: xlrelease.StringVariable
-      showOnReleaseStart: false
+  - key: environmentsYaml
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
 
-    - key: environmentsJson
-      type: xlrelease.StringVariable
-      showOnReleaseStart: false
+  - key: availableComponentsText
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
 
-    - key: componentConfigJson
-      type: xlrelease.StringVariable
-      showOnReleaseStart: false
+  - key: availableEnvironmentsText
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
 
-    - key: targetEnvironmentsJson
-      type: xlrelease.StringVariable
-      showOnReleaseStart: false
+  - key: componentsJson
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
 
-    - key: selectedEnvConfigsJson
-      type: xlrelease.StringVariable
-      showOnReleaseStart: false
+  - key: environmentsJson
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
 
-    - key: needsApproval
-      type: xlrelease.StringVariable
-      value: "false"
-      showOnReleaseStart: false
+  - key: componentConfigJson
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
 
-    - key: approvalEnvsJson
-      type: xlrelease.StringVariable
-      showOnReleaseStart: false
+  - key: targetEnvironmentsJson
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
 
-    - key: releaseBranch
-      type: xlrelease.StringVariable
-      showOnReleaseStart: false
+  - key: selectedEnvConfigsJson
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
 
-    - key: mergeRequestIid
-      type: xlrelease.StringVariable
-      showOnReleaseStart: false
+  - key: needsApproval
+    type: xlrelease.StringVariable
+    value: "false"
+    showOnReleaseStart: false
 
-    - key: mergeRequestUrl
-      type: xlrelease.StringVariable
-      showOnReleaseStart: false
+  - key: approvalEnvsJson
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
 
-    - key: gitopsTag
-      type: xlrelease.StringVariable
-      showOnReleaseStart: false
+  - key: gitopsProject
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
 
-    - key: argocdDeployResultsJson
-      type: xlrelease.StringVariable
-      showOnReleaseStart: false
+  - key: gitopsBaseBranch
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
 
-    - key: waitResultsJson
-      type: xlrelease.StringVariable
-      showOnReleaseStart: false
+  - key: releaseBranch
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
 
-    - key: allHealthy
-      type: xlrelease.StringVariable
-      value: "false"
-      showOnReleaseStart: false
+  - key: mergeRequestIid
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
 
-    - key: performRollback
-      type: xlrelease.StringVariable
-      value: "false"
-      showOnReleaseStart: false
+  - key: mergeRequestUrl
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
 
-    - key: rollbackTag
-      type: xlrelease.StringVariable
-      showOnReleaseStart: false
+  - key: argocdDeployResultsJson
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
 
-    - key: deploymentReport
-      type: xlrelease.StringVariable
-      showOnReleaseStart: false
+  - key: waitResultsJson
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
 
-    - key: overallSuccess
-      type: xlrelease.StringVariable
-      value: "false"
-      showOnReleaseStart: false
+  - key: allHealthy
+    type: xlrelease.StringVariable
+    value: "false"
+    showOnReleaseStart: false
+
+  - key: performRollback
+    type: xlrelease.StringVariable
+    value: "false"
+    showOnReleaseStart: false
+
+  - key: rollbackTag
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
+
+  - key: deploymentReport
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
+
+  - key: overallSuccess
+    type: xlrelease.StringVariable
+    value: "false"
+    showOnReleaseStart: false
+
+  - key: releaseId
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
+
+  - key: releaseOwner
+    type: xlrelease.StringVariable
+    showOnReleaseStart: false
 
   phases:
 
-    # =============================================================
-    # PHASE 1 : CHARGEMENT DU CATALOGUE
-    # ScriptTask pour la lecture des fichiers (pas de plugin natif)
-    # =============================================================
-    - phase: "1 - Chargement du Catalogue"
-      color: "#0099CC"
+  # ============================================================
+  # PHASE 1 : Chargement
+  # ============================================================
+  - phase: "1 - Chargement"
+    tasks:
 
-      tasks:
-
-        # -------------------------------------------------------
-        # 1.1 Charger lib.py + catalog YAML en une seule ScriptTask
-        # On utilise directement l'objet serveur GitLab de DAI
-        # -------------------------------------------------------
-        - name: "Charger lib.py et les catalogues YAML"
-          type: xlrelease.ScriptTask
-          script: |
-            import json
-            import base64
-            import sys
-
-            # ---- Recuperer la config du serveur GitLab depuis DAI ----
-            server_title = releaseVariables.get(
-                "gitlabServer", "GitLab Server"
-            )
-            servers = configurationApi.searchByTypeAndTitle(
-                "gitlab.Server", server_title
-            )
-            if not servers:
-                raise Exception(
-                    "Serveur GitLab '%s' non trouve dans DAI "
-                    "Settings > Shared Configuration" % server_title
-                )
-            server = servers[0]
-
-            gitlab_url   = server.getProperty("url")
-            gitlab_token = server.getProperty("token")
-
-            print("GitLab URL   : %s" % gitlab_url)
-            print("Automation   : %s @ %s" % (
-                releaseVariables["automationProject"],
-                releaseVariables["automationRef"]
-            ))
-            print("Catalog      : %s @ %s" % (
-                releaseVariables["catalogProject"],
-                releaseVariables["catalogRef"]
-            ))
-
-            # ---- Fonction utilitaire pour lire un fichier GitLab ----
-            try:
-                from urllib2 import Request, urlopen, HTTPError
-                from urllib import quote
-            except ImportError:
-                from urllib.request import Request, urlopen
-                from urllib.error import HTTPError
-                from urllib.parse import quote
-
-            import ssl
-            ssl_ctx = ssl.create_default_context()
-            ssl_ctx.check_hostname = False
-            ssl_ctx.verify_mode = ssl.CERT_NONE
-
-            def read_gitlab_file(project, file_path, ref):
-                api_url = "%s/api/v4/projects/%s/repository/files/%s" % (
-                    gitlab_url.rstrip("/"),
-                    quote(project, safe=""),
-                    quote(file_path, safe="")
-                )
-                req = Request(api_url)
-                req.add_header("PRIVATE-TOKEN", gitlab_token)
-
-                full_url = api_url + "?ref=" + quote(ref, safe="")
-                req2 = Request(full_url)
-                req2.add_header("PRIVATE-TOKEN", gitlab_token)
-
+    - name: "1.1 - Diagnostic variables de folder"
+      type: xlrelease.ScriptTask
+      script: |
+        required_vars = [
+            "gitlabServer",
+            "automationProject",
+            "automationRef",
+            "catalogProject",
+            "catalogRef",
+            "argocdDevServer",
+            "argocdStagingServer",
+            "argocdProdServer"
+        ]
+        missing = []
+        for v in required_vars:
+            val = releaseVariables.get(v)
+            if val is None or val == "":
+                print("[MISSING] %s" % v)
+                missing.append(v)
+            else:
+                val_type = type(val).__name__
+                print("[OK]      %s = %s (type: %s)" % (v, str(val)[:60], val_type))
                 try:
-                    resp = urlopen(req2, context=ssl_ctx, timeout=30)
-                    data = json.loads(resp.read().decode("utf-8"))
-                    content = data.get("content", "")
-                    encoding = data.get("encoding", "base64")
-                    if encoding == "base64":
-                        return base64.b64decode(content).decode("utf-8")
-                    return content
-                except HTTPError as e:
-                    body = e.read().decode("utf-8")
-                    raise Exception(
-                        "GitLab read error %s [%s@%s]: HTTP %d - %s" % (
-                            file_path, project, ref, e.code, body
-                        )
-                    )
+                    print("          -> url = %s" % val.getProperty("url"))
+                except:
+                    pass
 
-            # ---- Lire lib.py ----
-            print("\nLecture de lib.py ...")
-            lib_content = read_gitlab_file(
-                releaseVariables["automationProject"],
-                "scripts/common/lib.py",
-                releaseVariables["automationRef"]
-            )
-            releaseVariables["commonLibPy"] = lib_content
-            print("lib.py charge (%d octets)" % len(lib_content))
-
-            # ---- Lire components.yaml ----
-            print("\nLecture de components.yaml ...")
-            comp_content = read_gitlab_file(
-                releaseVariables["catalogProject"],
-                "config/components.yaml",
-                releaseVariables["catalogRef"]
-            )
-            releaseVariables["componentsYaml"] = comp_content
-            print("components.yaml charge (%d octets)" % len(comp_content))
-
-            # ---- Lire environments.yaml ----
-            print("\nLecture de environments.yaml ...")
-            env_content = read_gitlab_file(
-                releaseVariables["catalogProject"],
-                "config/environments.yaml",
-                releaseVariables["catalogRef"]
-            )
-            releaseVariables["environmentsYaml"] = env_content
-            print("environments.yaml charge (%d octets)" % len(env_content))
-
-        # -------------------------------------------------------
-        # 1.2 Executer show_catalog.py
-        # -------------------------------------------------------
-        - name: "Executer show_catalog"
-          type: xlrelease.ScriptTask
-          script: |
-            import json
-            import base64
-            import ssl
-
-            try:
-                from urllib2 import Request, urlopen, HTTPError
-                from urllib import quote
-            except ImportError:
-                from urllib.request import Request, urlopen
-                from urllib.error import HTTPError
-                from urllib.parse import quote
-
-            # ---- Helper lecture GitLab (reutilise dans chaque task) ----
-            server_title = releaseVariables.get(
-                "gitlabServer", "GitLab Server"
-            )
-            servers = configurationApi.searchByTypeAndTitle(
-                "gitlab.Server", server_title
-            )
-            server     = servers[0]
-            gitlab_url   = server.getProperty("url")
-            gitlab_token = server.getProperty("token")
-
-            ssl_ctx = ssl.create_default_context()
-            ssl_ctx.check_hostname = False
-            ssl_ctx.verify_mode = ssl.CERT_NONE
-
-            def read_gitlab_file(project, file_path, ref):
-                full_url = "%s/api/v4/projects/%s/repository/files/%s?ref=%s" % (
-                    gitlab_url.rstrip("/"),
-                    quote(project, safe=""),
-                    quote(file_path, safe=""),
-                    quote(ref, safe="")
+        if missing:
+            raise Exception(
+                "Variables de folder manquantes : %s\n"
+                "Configurer dans le folder DAI Release." % (
+                    ", ".join(missing)
                 )
-                req = Request(full_url)
-                req.add_header("PRIVATE-TOKEN", gitlab_token)
-                try:
-                    resp = urlopen(req, context=ssl_ctx, timeout=30)
-                    data = json.loads(resp.read().decode("utf-8"))
-                    c = data.get("content", "")
-                    e = data.get("encoding", "base64")
-                    return base64.b64decode(c).decode("utf-8") if e=="base64" else c
-                except HTTPError as ex:
-                    body = ex.read().decode("utf-8")
-                    raise Exception("GitLab %s: HTTP %d - %s" % (
-                        file_path, ex.code, body
-                    ))
+            )
+        print("\nToutes les variables de folder sont presentes.")
 
-            # ---- Charger le script ----
-            task_code = read_gitlab_file(
-                releaseVariables["automationProject"],
-                "scripts/tasks/show_catalog.py",
-                releaseVariables["automationRef"]
+    - name: "1.2 - Charger fichiers GitLab"
+      type: xlrelease.ScriptTask
+      script: |
+        import json
+        import base64
+        import ssl
+
+        try:
+            from urllib2 import Request, urlopen, HTTPError
+            from urllib import quote
+        except ImportError:
+            from urllib.request import Request, urlopen
+            from urllib.error import HTTPError
+            from urllib.parse import quote
+
+        # Recuperer GitLab depuis variable de configuration
+        gl_server = releaseVariables.get("gitlabServer")
+        gl_url = None
+        gl_token = None
+
+        # Essayer getProperty
+        try:
+            gl_url = gl_server.getProperty("url")
+            gl_token = gl_server.getProperty("token")
+        except:
+            pass
+
+        # Fallback: chercher par titre
+        if not gl_url:
+            try:
+                title = str(gl_server)
+                items = configurationApi.searchByTypeAndTitle("gitlab.Server", title)
+                if items:
+                    gl_url = items[0].getProperty("url")
+                    gl_token = items[0].getProperty("token")
+            except:
+                pass
+
+        if not gl_url or not gl_token:
+            raise Exception(
+                "Impossible de lire les credentials GitLab.\n"
+                "Variable gitlabServer = %s (type: %s)" % (
+                    str(gl_server)[:100], type(gl_server).__name__
+                )
             )
 
-            # ---- Executer le script dans un scope qui contient lib ----
-            scope = {
-                "releaseVariables": releaseVariables,
-                "configurationApi": configurationApi,
-                "release": release
-            }
-            exec(releaseVariables["commonLibPy"], scope)
-            exec(task_code, scope)
+        gl_url = gl_url.rstrip("/")
+        print("GitLab URL : %s" % gl_url)
 
-            result = scope["run_in_dai"](releaseVariables, configurationApi)
-            if result:
-                for key, value in result.items():
-                    releaseVariables[key] = (
-                        json.dumps(value)
-                        if isinstance(value, (dict, list))
-                        else ("" if value is None else str(value))
-                    )
+        ssl_ctx = ssl.create_default_context()
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = ssl.CERT_NONE
 
-    # =============================================================
-    # PHASE 2 : SELECTION UTILISATEUR
-    # =============================================================
-    - phase: "2 - Selection Utilisateur"
-      color: "#FF9900"
-
-      tasks:
-
-        - name: "Choisir composant et environnements"
-          type: xlrelease.UserInputTask
-          description: |
-            ============================================================
-            COMPOSANTS DISPONIBLES :
-            ${availableComponentsText}
-
-            ENVIRONNEMENTS DISPONIBLES :
-            ${availableEnvironmentsText}
-
-            Remplir les champs ci-dessous :
-            - componentName         : nom exact du composant
-            - targetEnvironmentsCsv : envs separes par virgule
-              Exemple : dev  ou  dev,staging  ou  prod
-            - imageTag              : tag Docker a deployer
-            ============================================================
-          variables:
-            - componentName
-            - targetEnvironmentsCsv
-            - imageTag
-
-        - name: "Valider la selection"
-          type: xlrelease.ScriptTask
-          script: |
-            import json, base64, ssl
-
+        def read_file(project, path, ref):
+            url = "%s/api/v4/projects/%s/repository/files/%s?ref=%s" % (
+                gl_url,
+                quote(project, safe=""),
+                quote(path, safe=""),
+                quote(ref, safe="")
+            )
+            req = Request(url)
+            req.add_header("PRIVATE-TOKEN", gl_token)
             try:
-                from urllib2 import Request, urlopen, HTTPError
-                from urllib import quote
-            except ImportError:
-                from urllib.request import Request, urlopen
-                from urllib.error import HTTPError
-                from urllib.parse import quote
-
-            server_title = releaseVariables.get("gitlabServer","GitLab Server")
-            server = configurationApi.searchByTypeAndTitle(
-                "gitlab.Server", server_title
-            )[0]
-            gitlab_url   = server.getProperty("url")
-            gitlab_token = server.getProperty("token")
-
-            ssl_ctx = ssl.create_default_context()
-            ssl_ctx.check_hostname = False
-            ssl_ctx.verify_mode = ssl.CERT_NONE
-
-            def read_gitlab_file(project, file_path, ref):
-                full_url = "%s/api/v4/projects/%s/repository/files/%s?ref=%s" % (
-                    gitlab_url.rstrip("/"),
-                    quote(project, safe=""),
-                    quote(file_path, safe=""),
-                    quote(ref, safe="")
-                )
-                req = Request(full_url)
-                req.add_header("PRIVATE-TOKEN", gitlab_token)
                 resp = urlopen(req, context=ssl_ctx, timeout=30)
                 data = json.loads(resp.read().decode("utf-8"))
-                c = data.get("content","")
-                e = data.get("encoding","base64")
-                return base64.b64decode(c).decode("utf-8") if e=="base64" else c
+                c = data.get("content", "")
+                e = data.get("encoding", "base64")
+                if e == "base64":
+                    return base64.b64decode(c).decode("utf-8")
+                return c
+            except HTTPError as ex:
+                body = ex.read().decode("utf-8")
+                raise Exception("GitLab HTTP %d [%s]: %s" % (ex.code, path, body))
 
-            task_code = read_gitlab_file(
-                releaseVariables["automationProject"],
-                "scripts/tasks/validate_selection.py",
-                releaseVariables["automationRef"]
+        auto_proj = releaseVariables["automationProject"]
+        auto_ref = releaseVariables["automationRef"]
+        cat_proj = releaseVariables["catalogProject"]
+        cat_ref = releaseVariables["catalogRef"]
+
+        print("\nChargement lib.py ...")
+        releaseVariables["commonLibPy"] = read_file(
+            auto_proj, "scripts/common/lib.py", auto_ref
+        )
+        print("OK (%d octets)" % len(releaseVariables["commonLibPy"]))
+
+        print("\nChargement components.yaml ...")
+        releaseVariables["componentsYaml"] = read_file(
+            cat_proj, "config/components.yaml", cat_ref
+        )
+        print("OK (%d octets)" % len(releaseVariables["componentsYaml"]))
+
+        print("\nChargement environments.yaml ...")
+        releaseVariables["environmentsYaml"] = read_file(
+            cat_proj, "config/environments.yaml", cat_ref
+        )
+        print("OK (%d octets)" % len(releaseVariables["environmentsYaml"]))
+
+    - name: "1.3 - Afficher le catalogue"
+      type: xlrelease.ScriptTask
+      script: |
+        import json
+        import base64
+        import ssl
+        try:
+            from urllib2 import Request, urlopen, HTTPError
+            from urllib import quote
+        except ImportError:
+            from urllib.request import Request, urlopen
+            from urllib.error import HTTPError
+            from urllib.parse import quote
+
+        # Lire le script show_catalog.py depuis GitLab
+        gl_server = releaseVariables.get("gitlabServer")
+        try:
+            gl_url = gl_server.getProperty("url").rstrip("/")
+            gl_token = gl_server.getProperty("token")
+        except:
+            title = str(gl_server)
+            items = configurationApi.searchByTypeAndTitle("gitlab.Server", title)
+            gl_url = items[0].getProperty("url").rstrip("/")
+            gl_token = items[0].getProperty("token")
+
+        ssl_ctx = ssl.create_default_context()
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = ssl.CERT_NONE
+
+        def read_file(project, path, ref):
+            url = "%s/api/v4/projects/%s/repository/files/%s?ref=%s" % (
+                gl_url, quote(project, safe=""),
+                quote(path, safe=""), quote(ref, safe="")
             )
+            req = Request(url)
+            req.add_header("PRIVATE-TOKEN", gl_token)
+            resp = urlopen(req, context=ssl_ctx, timeout=30)
+            data = json.loads(resp.read().decode("utf-8"))
+            c = data.get("content", "")
+            e = data.get("encoding", "base64")
+            return base64.b64decode(c).decode("utf-8") if e == "base64" else c
 
-            scope = {
-                "releaseVariables": releaseVariables,
-                "configurationApi": configurationApi,
-                "release": release
-            }
-            exec(releaseVariables["commonLibPy"], scope)
-            exec(task_code, scope)
+        task_code = read_file(
+            releaseVariables["automationProject"],
+            "scripts/tasks/show_catalog.py",
+            releaseVariables["automationRef"]
+        )
 
-            result = scope["run_in_dai"](releaseVariables, configurationApi)
-            if result:
-                for key, value in result.items():
-                    releaseVariables[key] = (
-                        json.dumps(value)
-                        if isinstance(value, (dict, list))
-                        else ("" if value is None else str(value))
-                    )
+        scope = {
+            "releaseVariables": releaseVariables,
+            "configurationApi": configurationApi,
+            "release": release
+        }
+        exec(releaseVariables["commonLibPy"], scope)
+        exec(task_code, scope)
 
-    # =============================================================
-    # PHASE 3 : GITOPS UPDATE
-    # Lecture values via ScriptTask + branche/MR via plugin natif
-    # =============================================================
-    - phase: "3 - Mise a jour GitOps"
-      color: "#9933CC"
-
-      tasks:
-
-        # -------------------------------------------------------
-        # 3.1 Calculer les infos (branche, contenu values)
-        # -------------------------------------------------------
-        - name: "Preparer les donnees GitOps"
-          type: xlrelease.ScriptTask
-          script: |
-            import json, base64, ssl
-
-            try:
-                from urllib2 import Request, urlopen, HTTPError
-                from urllib import quote
-            except ImportError:
-                from urllib.request import Request, urlopen
-                from urllib.error import HTTPError
-                from urllib.parse import quote
-
-            server_title = releaseVariables.get("gitlabServer","GitLab Server")
-            server = configurationApi.searchByTypeAndTitle(
-                "gitlab.Server", server_title
-            )[0]
-            gitlab_url   = server.getProperty("url")
-            gitlab_token = server.getProperty("token")
-
-            ssl_ctx = ssl.create_default_context()
-            ssl_ctx.check_hostname = False
-            ssl_ctx.verify_mode = ssl.CERT_NONE
-
-            def read_gitlab_file(project, file_path, ref):
-                full_url = "%s/api/v4/projects/%s/repository/files/%s?ref=%s" % (
-                    gitlab_url.rstrip("/"),
-                    quote(project, safe=""),
-                    quote(file_path, safe=""),
-                    quote(ref, safe="")
-                )
-                req = Request(full_url)
-                req.add_header("PRIVATE-TOKEN", gitlab_token)
-                try:
-                    resp = urlopen(req, context=ssl_ctx, timeout=30)
-                    data = json.loads(resp.read().decode("utf-8"))
-                    c = data.get("content","")
-                    e = data.get("encoding","base64")
-                    return base64.b64decode(c).decode("utf-8") if e=="base64" else c
-                except HTTPError as ex:
-                    if ex.code == 404:
-                        return None
-                    raise
-
-            task_code = read_gitlab_file(
-                releaseVariables["automationProject"],
-                "scripts/tasks/build_gitops_update.py",
-                releaseVariables["automationRef"]
-            )
-
-            scope = {
-                "releaseVariables": releaseVariables,
-                "configurationApi": configurationApi,
-                "release": release
-            }
-            releaseVariables["releaseId"]    = str(release.id)
-            releaseVariables["releaseOwner"] = str(release.owner)
-
-            exec(releaseVariables["commonLibPy"], scope)
-            exec(task_code, scope)
-
-            result = scope["run_in_dai"](releaseVariables, configurationApi)
-            if result:
-                for key, value in result.items():
-                    releaseVariables[key] = (
-                        json.dumps(value)
-                        if isinstance(value, (dict, list))
-                        else ("" if value is None else str(value))
-                    )
-
-        # -------------------------------------------------------
-        # 3.2 Creer la branche via plugin GitLab natif
-        # -------------------------------------------------------
-        - name: "Creer la branche de release"
-          type: gitlab.CreateBranch
-          server: "GitLab Server"
-          project: "${componentConfigJson.gitopsRepoProject}"
-          branch: "${releaseBranch}"
-          startBranch: "main"
-
-        # -------------------------------------------------------
-        # 3.3 Mettre a jour les values files via ScriptTask
-        # (pas de tâche native pour l'upload de fichier)
-        # -------------------------------------------------------
-        - name: "Mettre a jour les values files"
-          type: xlrelease.ScriptTask
-          script: |
-            import json, base64, ssl
-
-            try:
-                from urllib2 import Request, urlopen, HTTPError
-                from urllib import quote
-            except ImportError:
-                from urllib.request import Request, urlopen
-                from urllib.error import HTTPError
-                from urllib.parse import quote
-
-            server_title = releaseVariables.get("gitlabServer","GitLab Server")
-            server = configurationApi.searchByTypeAndTitle(
-                "gitlab.Server", server_title
-            )[0]
-            gitlab_url   = server.getProperty("url")
-            gitlab_token = server.getProperty("token")
-
-            ssl_ctx = ssl.create_default_context()
-            ssl_ctx.check_hostname = False
-            ssl_ctx.verify_mode = ssl.CERT_NONE
-
-            component   = json.loads(releaseVariables["componentConfigJson"])
-            target_envs = json.loads(releaseVariables["targetEnvironmentsJson"])
-            image_tag   = releaseVariables["imageTag"]
-            branch      = releaseVariables["releaseBranch"]
-            release_id  = releaseVariables.get("releaseId","unknown")
-            gitops_proj = component["gitopsRepoProject"]
-            chart_path  = component["chartPath"]
-            base_branch = component.get("gitopsRepoBranch","main")
-
-            def gitlab_request(method, project, file_path, body=None, ref=None):
-                url = "%s/api/v4/projects/%s/repository/files/%s" % (
-                    gitlab_url.rstrip("/"),
-                    quote(project, safe=""),
-                    quote(file_path, safe="")
-                )
-                if ref:
-                    url += "?ref=" + quote(ref, safe="")
-                data = json.dumps(body).encode("utf-8") if body else None
-                req = Request(url, data=data)
-                req.get_method = lambda: method
-                req.add_header("PRIVATE-TOKEN", gitlab_token)
-                req.add_header("Content-Type", "application/json")
-                try:
-                    resp = urlopen(req, context=ssl_ctx, timeout=30)
-                    raw = resp.read()
-                    return json.loads(raw.decode("utf-8")) if raw else {}
-                except HTTPError as e:
-                    return {"_error": e.code, "_body": e.read().decode("utf-8")}
-
-            def read_file(proj, path, ref):
-                resp = gitlab_request("GET", proj, path, ref=ref)
-                if "_error" in resp:
-                    return None
-                c = resp.get("content","")
-                e = resp.get("encoding","base64")
-                return base64.b64decode(c).decode("utf-8") if e=="base64" else c
-
-            def write_file(proj, path, content, branch, msg):
-                body = {
-                    "branch": branch,
-                    "content": content,
-                    "commit_message": msg,
-                    "encoding": "text"
-                }
-                # Try PUT (update)
-                resp = gitlab_request("PUT", proj, path, body=body)
-                if resp.get("_error") == 400 or resp.get("_error") == 404:
-                    # File does not exist, use POST (create)
-                    resp = gitlab_request("POST", proj, path, body=body)
-                return resp
-
-            updated = []
-            for env_name in target_envs:
-                file_path = "%s/values-%s.yaml" % (chart_path, env_name)
-                print("Mise a jour: %s" % file_path)
-
-                # Lire contenu actuel
-                current = read_file(gitops_proj, file_path, base_branch)
-                if current:
-                    # Parse basique: chercher/remplacer la ligne tag
-                    lines = current.split("\n")
-                    new_lines = []
-                    tag_updated = False
-                    for line in lines:
-                        stripped = line.strip()
-                        if stripped.startswith("tag:"):
-                            indent = len(line) - len(line.lstrip())
-                            new_lines.append("%stag: \"%s\"" % (" " * indent, image_tag))
-                            tag_updated = True
-                        else:
-                            new_lines.append(line)
-                    if not tag_updated:
-                        new_lines.append("  tag: \"%s\"" % image_tag)
-                    new_content = "\n".join(new_lines)
+        result = scope["run_in_dai"](releaseVariables, configurationApi)
+        if result:
+            for key, value in result.items():
+                if isinstance(value, (dict, list)):
+                    releaseVariables[key] = json.dumps(value)
                 else:
-                    new_content = "image:\n  tag: \"%s\"\n" % image_tag
+                    releaseVariables[key] = ("" if value is None else str(value))
 
-                # Ecrire dans la branche
-                write_file(
-                    gitops_proj, file_path, new_content, branch,
-                    "chore: update image.tag to %s for %s [release-%s]" % (
-                        image_tag, env_name, release_id
-                    )
-                )
-                updated.append(file_path)
-                print("  OK: %s" % file_path)
+  # ============================================================
+  # PHASE 2 : Saisie utilisateur
+  # ============================================================
+  - phase: "2 - Saisie et Validation"
+    tasks:
 
-            print("\nFichiers mis a jour: %s" % updated)
+    - name: "2.1 - Saisir les parametres"
+      type: xlrelease.UserInputTask
+      description: |
+        COMPOSANTS DISPONIBLES :
+        ${availableComponentsText}
 
-        # -------------------------------------------------------
-        # 3.4 Creer la MR via plugin GitLab natif
-        # -------------------------------------------------------
-        - name: "Creer la Merge Request"
-          type: gitlab.CreateMergeRequest
-          server: "GitLab Server"
-          project: "${componentConfigJson.gitopsRepoProject}"
-          sourceBranch: "${releaseBranch}"
-          targetBranch: "main"
-          title: "deploy: ${componentName} v${imageTag}"
-          description: |
-            ## Deploiement automatique GitOps
+        ENVIRONNEMENTS DISPONIBLES :
+        ${availableEnvironmentsText}
 
-            - Composant : ${componentName}
-            - Version   : ${imageTag}
-            - Envs      : ${targetEnvironmentsCsv}
-            - Release   : ${releaseId}
+        Remplir les champs ci-dessous.
+      variables:
+      - componentName
+      - targetEnvironmentsCsv
+      - imageTag
 
-            Genere par Digital.ai Release.
-          output: mergeRequestIid
+    - name: "2.2 - Valider et preparer"
+      type: xlrelease.ScriptTask
+      script: |
+        import json
+        import base64
+        import ssl
+        try:
+            from urllib2 import Request, urlopen, HTTPError
+            from urllib import quote
+        except ImportError:
+            from urllib.request import Request, urlopen
+            from urllib.error import HTTPError
+            from urllib.parse import quote
 
-        # -------------------------------------------------------
-        # 3.5 Merger la MR via plugin GitLab natif
-        # -------------------------------------------------------
-        - name: "Merger la MR"
-          type: gitlab.MergeMergeRequest
-          server: "GitLab Server"
-          project: "${componentConfigJson.gitopsRepoProject}"
-          mergeRequestId: "${mergeRequestIid}"
+        gl_server = releaseVariables.get("gitlabServer")
+        try:
+            gl_url = gl_server.getProperty("url").rstrip("/")
+            gl_token = gl_server.getProperty("token")
+        except:
+            title = str(gl_server)
+            items = configurationApi.searchByTypeAndTitle("gitlab.Server", title)
+            gl_url = items[0].getProperty("url").rstrip("/")
+            gl_token = items[0].getProperty("token")
 
-        # -------------------------------------------------------
-        # 3.6 Creer un tag Git via plugin GitLab natif
-        # -------------------------------------------------------
-        - name: "Creer le tag de deploiement"
-          type: gitlab.CreateTag
-          server: "GitLab Server"
-          project: "${componentConfigJson.gitopsRepoProject}"
-          tagName: "deploy/${componentName}/${imageTag}-${releaseId}"
-          ref: "main"
-          message: "Deploy ${componentName} v${imageTag} - Release ${releaseId}"
+        ssl_ctx = ssl.create_default_context()
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = ssl.CERT_NONE
 
-    # =============================================================
-    # PHASE 4 : APPROBATION
-    # =============================================================
-    - phase: "4 - Approbation"
-      color: "#CC3333"
-
-      tasks:
-
-        - name: "Verification approbation requise"
-          type: xlrelease.ScriptTask
-          script: |
-            needs = releaseVariables.get("needsApproval","false")
-            envs  = releaseVariables.get("approvalEnvsJson","[]")
-            print("Approbation requise : %s" % needs)
-            print("Environnements prod : %s" % envs)
-
-        - name: "Approbation pour Production"
-          type: xlrelease.GateTask
-          precondition: "releaseVariables['needsApproval'] == 'true'"
-          description: |
-            Approbation requise avant le deploiement en production.
-
-            Composant : ${componentName}
-            Version   : ${imageTag}
-            Envs prod : ${approvalEnvsJson}
-
-            Verifier :
-            - Tests staging OK
-            - Plan rollback pret
-            - Equipe informee
-          conditions:
-            - name: "Tests staging valides"
-              checked: false
-            - name: "Plan rollback confirme"
-              checked: false
-            - name: "Equipe notifiee"
-              checked: false
-          team: "Release Managers"
-
-    # =============================================================
-    # PHASE 5 : DEPLOIEMENT ARGOCD
-    # =============================================================
-    - phase: "5 - Deploiement ArgoCD"
-      color: "#00CC66"
-
-      tasks:
-
-        - name: "Deployer sur ArgoCD"
-          type: xlrelease.ScriptTask
-          script: |
-            import json, base64, ssl
-
-            try:
-                from urllib2 import Request, urlopen, HTTPError
-                from urllib import quote
-            except ImportError:
-                from urllib.request import Request, urlopen
-                from urllib.error import HTTPError
-                from urllib.parse import quote
-
-            server_title = releaseVariables.get("gitlabServer","GitLab Server")
-            server = configurationApi.searchByTypeAndTitle(
-                "gitlab.Server", server_title
-            )[0]
-            gitlab_url   = server.getProperty("url")
-            gitlab_token = server.getProperty("token")
-
-            ssl_ctx = ssl.create_default_context()
-            ssl_ctx.check_hostname = False
-            ssl_ctx.verify_mode = ssl.CERT_NONE
-
-            def read_gitlab_file(project, file_path, ref):
-                full_url = "%s/api/v4/projects/%s/repository/files/%s?ref=%s" % (
-                    gitlab_url.rstrip("/"),
-                    quote(project, safe=""),
-                    quote(file_path, safe=""),
-                    quote(ref, safe="")
-                )
-                req = Request(full_url)
-                req.add_header("PRIVATE-TOKEN", gitlab_token)
-                resp = urlopen(req, context=ssl_ctx, timeout=30)
-                data = json.loads(resp.read().decode("utf-8"))
-                c = data.get("content","")
-                e = data.get("encoding","base64")
-                return base64.b64decode(c).decode("utf-8") if e=="base64" else c
-
-            task_code = read_gitlab_file(
-                releaseVariables["automationProject"],
-                "scripts/tasks/build_argocd_payload.py",
-                releaseVariables["automationRef"]
+        def read_file(project, path, ref):
+            url = "%s/api/v4/projects/%s/repository/files/%s?ref=%s" % (
+                gl_url, quote(project, safe=""),
+                quote(path, safe=""), quote(ref, safe="")
             )
+            req = Request(url)
+            req.add_header("PRIVATE-TOKEN", gl_token)
+            resp = urlopen(req, context=ssl_ctx, timeout=30)
+            data = json.loads(resp.read().decode("utf-8"))
+            c = data.get("content", "")
+            e = data.get("encoding", "base64")
+            return base64.b64decode(c).decode("utf-8") if e == "base64" else c
 
-            scope = {
-                "releaseVariables": releaseVariables,
-                "configurationApi": configurationApi,
-                "release": release
-            }
-            releaseVariables["releaseId"]    = str(release.id)
-            releaseVariables["releaseOwner"] = str(release.owner)
+        task_code = read_file(
+            releaseVariables["automationProject"],
+            "scripts/tasks/validate_selection.py",
+            releaseVariables["automationRef"]
+        )
 
-            exec(releaseVariables["commonLibPy"], scope)
-            exec(task_code, scope)
+        scope = {
+            "releaseVariables": releaseVariables,
+            "configurationApi": configurationApi,
+            "release": release
+        }
+        exec(releaseVariables["commonLibPy"], scope)
+        exec(task_code, scope)
 
-            result = scope["run_in_dai"](releaseVariables, configurationApi)
-            if result:
-                for key, value in result.items():
-                    releaseVariables[key] = (
-                        json.dumps(value)
-                        if isinstance(value, (dict, list))
-                        else ("" if value is None else str(value))
-                    )
+        result = scope["run_in_dai"](releaseVariables, configurationApi)
+        if result:
+            for key, value in result.items():
+                if isinstance(value, (dict, list)):
+                    releaseVariables[key] = json.dumps(value)
+                else:
+                    releaseVariables[key] = ("" if value is None else str(value))
 
-        - name: "Attendre synchronisation ArgoCD"
-          type: xlrelease.ScriptTask
-          script: |
-            import json, base64, ssl
+        # Extraire les variables simples pour les tasks plugin GitLab
+        component = json.loads(releaseVariables["componentConfigJson"])
+        releaseVariables["gitopsProject"] = component.get("gitopsRepoProject", "")
+        releaseVariables["gitopsBaseBranch"] = component.get("gitopsRepoBranch", "main")
+        releaseVariables["releaseId"] = str(release.id)
+        releaseVariables["releaseOwner"] = str(release.owner)
+        releaseVariables["releaseBranch"] = "release/%s-%s-%s" % (
+            component.get("name", "app"),
+            releaseVariables["imageTag"],
+            str(release.id)
+        )
 
-            try:
-                from urllib2 import Request, urlopen, HTTPError
-                from urllib import quote
-            except ImportError:
-                from urllib.request import Request, urlopen
-                from urllib.error import HTTPError
-                from urllib.parse import quote
+        print("gitopsProject   : %s" % releaseVariables["gitopsProject"])
+        print("releaseBranch   : %s" % releaseVariables["releaseBranch"])
+        print("needsApproval   : %s" % releaseVariables["needsApproval"])
 
-            server_title = releaseVariables.get("gitlabServer","GitLab Server")
-            server = configurationApi.searchByTypeAndTitle(
-                "gitlab.Server", server_title
-            )[0]
-            gitlab_url   = server.getProperty("url")
-            gitlab_token = server.getProperty("token")
+  # ============================================================
+  # PHASE 3 : GitOps Update
+  # ============================================================
+  - phase: "3 - Mise a jour GitOps"
+    tasks:
 
-            ssl_ctx = ssl.create_default_context()
-            ssl_ctx.check_hostname = False
-            ssl_ctx.verify_mode = ssl.CERT_NONE
+    - name: "3.1 - Creer la branche"
+      type: gitlab.CreateBranch
+      server: "${gitlabServer}"
+      project: "${gitopsProject}"
+      branch: "${releaseBranch}"
+      ref: "${gitopsBaseBranch}"
 
-            def read_gitlab_file(project, file_path, ref):
-                full_url = "%s/api/v4/projects/%s/repository/files/%s?ref=%s" % (
-                    gitlab_url.rstrip("/"),
-                    quote(project, safe=""),
-                    quote(file_path, safe=""),
-                    quote(ref, safe="")
-                )
-                req = Request(full_url)
-                req.add_header("PRIVATE-TOKEN", gitlab_token)
-                resp = urlopen(req, context=ssl_ctx, timeout=30)
-                data = json.loads(resp.read().decode("utf-8"))
-                c = data.get("content","")
-                e = data.get("encoding","base64")
-                return base64.b64decode(c).decode("utf-8") if e=="base64" else c
+    - name: "3.2 - Mettre a jour les values"
+      type: xlrelease.ScriptTask
+      script: |
+        import json
+        import base64
+        import ssl
+        try:
+            from urllib2 import Request, urlopen, HTTPError
+            from urllib import quote
+        except ImportError:
+            from urllib.request import Request, urlopen
+            from urllib.error import HTTPError
+            from urllib.parse import quote
 
-            task_code = read_gitlab_file(
-                releaseVariables["automationProject"],
-                "scripts/tasks/wait_sync.py",
-                releaseVariables["automationRef"]
+        gl_server = releaseVariables.get("gitlabServer")
+        try:
+            gl_url = gl_server.getProperty("url").rstrip("/")
+            gl_token = gl_server.getProperty("token")
+        except:
+            title = str(gl_server)
+            items = configurationApi.searchByTypeAndTitle("gitlab.Server", title)
+            gl_url = items[0].getProperty("url").rstrip("/")
+            gl_token = items[0].getProperty("token")
+
+        ssl_ctx = ssl.create_default_context()
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = ssl.CERT_NONE
+
+        component = json.loads(releaseVariables["componentConfigJson"])
+        target_envs = json.loads(releaseVariables["targetEnvironmentsJson"])
+        image_tag = releaseVariables["imageTag"]
+        branch = releaseVariables["releaseBranch"]
+        release_id = releaseVariables["releaseId"]
+        gitops_proj = releaseVariables["gitopsProject"]
+        base_branch = releaseVariables["gitopsBaseBranch"]
+        chart_path = component.get("chartPath", "")
+
+        def gitlab_file_op(method, project, file_path, body=None, ref=None):
+            url = "%s/api/v4/projects/%s/repository/files/%s" % (
+                gl_url, quote(project, safe=""), quote(file_path, safe="")
             )
-
-            scope = {
-                "releaseVariables": releaseVariables,
-                "configurationApi": configurationApi,
-                "release": release
-            }
-            exec(releaseVariables["commonLibPy"], scope)
-            exec(task_code, scope)
-
-            result = scope["run_in_dai"](releaseVariables, configurationApi)
-            if result:
-                for key, value in result.items():
-                    releaseVariables[key] = (
-                        json.dumps(value)
-                        if isinstance(value, (dict, list))
-                        else ("" if value is None else str(value))
-                    )
-
-    # =============================================================
-    # PHASE 6 : RAPPORT
-    # =============================================================
-    - phase: "6 - Rapport Final"
-      color: "#666666"
-
-      tasks:
-
-        - name: "Generer le rapport"
-          type: xlrelease.ScriptTask
-          script: |
-            import json, base64, ssl
-
+            if ref:
+                url += "?ref=" + quote(ref, safe="")
+            data = json.dumps(body).encode("utf-8") if body else None
+            req = Request(url, data=data)
+            req.get_method = lambda: method
+            req.add_header("PRIVATE-TOKEN", gl_token)
+            req.add_header("Content-Type", "application/json")
             try:
-                from urllib2 import Request, urlopen, HTTPError
-                from urllib import quote
-            except ImportError:
-                from urllib.request import Request, urlopen
-                from urllib.error import HTTPError
-                from urllib.parse import quote
-
-            server_title = releaseVariables.get("gitlabServer","GitLab Server")
-            server = configurationApi.searchByTypeAndTitle(
-                "gitlab.Server", server_title
-            )[0]
-            gitlab_url   = server.getProperty("url")
-            gitlab_token = server.getProperty("token")
-
-            ssl_ctx = ssl.create_default_context()
-            ssl_ctx.check_hostname = False
-            ssl_ctx.verify_mode = ssl.CERT_NONE
-
-            def read_gitlab_file(project, file_path, ref):
-                full_url = "%s/api/v4/projects/%s/repository/files/%s?ref=%s" % (
-                    gitlab_url.rstrip("/"),
-                    quote(project, safe=""),
-                    quote(file_path, safe=""),
-                    quote(ref, safe="")
-                )
-                req = Request(full_url)
-                req.add_header("PRIVATE-TOKEN", gitlab_token)
                 resp = urlopen(req, context=ssl_ctx, timeout=30)
-                data = json.loads(resp.read().decode("utf-8"))
-                c = data.get("content","")
-                e = data.get("encoding","base64")
-                return base64.b64decode(c).decode("utf-8") if e=="base64" else c
+                raw = resp.read()
+                return json.loads(raw.decode("utf-8")) if raw else {}
+            except HTTPError as e:
+                return {"_error": e.code, "_body": e.read().decode("utf-8")}
 
-            task_code = read_gitlab_file(
-                releaseVariables["automationProject"],
-                "scripts/tasks/report.py",
-                releaseVariables["automationRef"]
-            )
+        def read_file(proj, path, ref):
+            resp = gitlab_file_op("GET", proj, path, ref=ref)
+            if "_error" in resp:
+                return None
+            c = resp.get("content", "")
+            e = resp.get("encoding", "base64")
+            return base64.b64decode(c).decode("utf-8") if e == "base64" else c
 
-            scope = {
-                "releaseVariables": releaseVariables,
-                "configurationApi": configurationApi,
-                "release": release
+        def write_file(proj, path, content, br, msg):
+            body = {
+                "branch": br, "content": content,
+                "commit_message": msg, "encoding": "text"
             }
-            releaseVariables["releaseId"]    = str(release.id)
-            releaseVariables["releaseOwner"] = str(release.owner)
+            resp = gitlab_file_op("PUT", proj, path, body=body)
+            if resp.get("_error") in (400, 404):
+                resp = gitlab_file_op("POST", proj, path, body=body)
+            if "_error" in resp:
+                raise Exception("Write error %s: %s" % (path, resp.get("_body","")))
 
-            exec(releaseVariables["commonLibPy"], scope)
-            exec(task_code, scope)
+        for env_name in target_envs:
+            fpath = "%s/values-%s.yaml" % (chart_path, env_name)
+            print("Update: %s" % fpath)
 
-            result = scope["run_in_dai"](releaseVariables, configurationApi)
-            if result:
-                for key, value in result.items():
-                    releaseVariables[key] = (
-                        json.dumps(value)
-                        if isinstance(value, (dict, list))
-                        else ("" if value is None else str(value))
-                    )
+            current = read_file(gitops_proj, fpath, base_branch)
+            if current:
+                lines = current.split("\n")
+                new_lines = []
+                done = False
+                for line in lines:
+                    if line.strip().startswith("tag:"):
+                        indent = len(line) - len(line.lstrip())
+                        new_lines.append('%stag: "%s"' % (" " * indent, image_tag))
+                        done = True
+                    else:
+                        new_lines.append(line)
+                if not done:
+                    new_lines.append('  tag: "%s"' % image_tag)
+                new_content = "\n".join(new_lines)
+            else:
+                new_content = 'image:\n  tag: "%s"\n' % image_tag
 
-        - name: "Verifier resultat"
-          type: xlrelease.ScriptTask
-          script: |
-            success = releaseVariables.get("overallSuccess","false")
-            report  = releaseVariables.get("deploymentReport","")
-            print("")
-            print("="*60)
-            print(report)
-            print("="*60)
-            if success != "true":
-                raise Exception("Deploiement echoue. Voir rapport.")
-
-    # =============================================================
-    # PHASE 7 : ROLLBACK
-    # =============================================================
-    - phase: "7 - Rollback"
-      color: "#FF0000"
-
-      tasks:
-
-        - name: "Rollback necessaire ?"
-          type: xlrelease.UserInputTask
-          precondition: "releaseVariables['allHealthy'] == 'false'"
-          description: |
-            Echec detecte durant le deploiement.
-
-            Rapport :
-            ${deploymentReport}
-
-            Voulez-vous effectuer un rollback ?
-          variables:
-            - performRollback
-            - rollbackTag
-
-        - name: "Executer rollback"
-          type: xlrelease.ScriptTask
-          precondition: "releaseVariables['performRollback'] == 'true'"
-          script: |
-            import json, base64, ssl
-
-            try:
-                from urllib2 import Request, urlopen, HTTPError
-                from urllib import quote
-            except ImportError:
-                from urllib.request import Request, urlopen
-                from urllib.error import HTTPError
-                from urllib.parse import quote
-
-            server_title = releaseVariables.get("gitlabServer","GitLab Server")
-            server = configurationApi.searchByTypeAndTitle(
-                "gitlab.Server", server_title
-            )[0]
-            gitlab_url   = server.getProperty("url")
-            gitlab_token = server.getProperty("token")
-
-            ssl_ctx = ssl.create_default_context()
-            ssl_ctx.check_hostname = False
-            ssl_ctx.verify_mode = ssl.CERT_NONE
-
-            def read_gitlab_file(project, file_path, ref):
-                full_url = "%s/api/v4/projects/%s/repository/files/%s?ref=%s" % (
-                    gitlab_url.rstrip("/"),
-                    quote(project, safe=""),
-                    quote(file_path, safe=""),
-                    quote(ref, safe="")
+            write_file(gitops_proj, fpath, new_content, branch,
+                "chore: update image.tag=%s for %s [release-%s]" % (
+                    image_tag, env_name, release_id
                 )
-                req = Request(full_url)
-                req.add_header("PRIVATE-TOKEN", gitlab_token)
-                resp = urlopen(req, context=ssl_ctx, timeout=30)
-                data = json.loads(resp.read().decode("utf-8"))
-                c = data.get("content","")
-                e = data.get("encoding","base64")
-                return base64.b64decode(c).decode("utf-8") if e=="base64" else c
-
-            task_code = read_gitlab_file(
-                releaseVariables["automationProject"],
-                "scripts/tasks/rollback.py",
-                releaseVariables["automationRef"]
             )
+            print("  OK")
 
-            scope = {
-                "releaseVariables": releaseVariables,
-                "configurationApi": configurationApi,
-                "release": release
-            }
-            exec(releaseVariables["commonLibPy"], scope)
-            exec(task_code, scope)
+    - name: "3.3 - Creer la MR"
+      type: gitlab.CreateMergeRequest
+      server: "${gitlabServer}"
+      project: "${gitopsProject}"
+      sourceBranch: "${releaseBranch}"
+      targetBranch: "${gitopsBaseBranch}"
+      title: "deploy: ${componentName} v${imageTag} [${releaseId}]"
+      description: "Deploy ${componentName} v${imageTag} to ${targetEnvironmentsCsv}"
 
-            result = scope["run_in_dai"](releaseVariables, configurationApi)
-            if result:
-                for key, value in result.items():
-                    releaseVariables[key] = (
-                        json.dumps(value)
-                        if isinstance(value, (dict, list))
-                        else ("" if value is None else str(value))
-                    )
+    - name: "3.4 - Merger la MR"
+      type: gitlab.MergeMergeRequest
+      server: "${gitlabServer}"
+      project: "${gitopsProject}"
+      mergeRequestId: "${mergeRequestIid}"
+
+    - name: "3.5 - Creer le tag"
+      type: gitlab.CreateTag
+      server: "${gitlabServer}"
+      project: "${gitopsProject}"
+      tagName: "deploy/${componentName}/${imageTag}"
+      ref: "${gitopsBaseBranch}"
+      message: "Deploy ${componentName} v${imageTag} [${releaseId}]"
+
+  # ============================================================
+  # PHASE 4 : Approbation
+  # ============================================================
+  - phase: "4 - Approbation"
+    tasks:
+
+    - name: "4.1 - Approbation Production"
+      type: xlrelease.GateTask
+      precondition: "releaseVariables['needsApproval'] == 'true'"
+      description: |
+        Approbation requise.
+
+        Composant : ${componentName}
+        Version   : ${imageTag}
+        Envs      : ${approvalEnvsJson}
+      conditions:
+      - name: "Tests staging valides"
+        checked: false
+      - name: "Plan rollback confirme"
+        checked: false
+      - name: "Equipe notifiee"
+        checked: false
+
+  # ============================================================
+  # PHASE 5 : Deploiement ArgoCD
+  # ============================================================
+  - phase: "5 - Deploiement ArgoCD"
+    tasks:
+
+    - name: "5.1 - Deployer sur ArgoCD"
+      type: xlrelease.ScriptTask
+      script: |
+        import json
+        import base64
+        import ssl
+        try:
+            from urllib2 import Request, urlopen, HTTPError
+            from urllib import quote
+        except ImportError:
+            from urllib.request import Request, urlopen
+            from urllib.error import HTTPError
+            from urllib.parse import quote
+
+        gl_server = releaseVariables.get("gitlabServer")
+        try:
+            gl_url = gl_server.getProperty("url").rstrip("/")
+            gl_token = gl_server.getProperty("token")
+        except:
+            title = str(gl_server)
+            items = configurationApi.searchByTypeAndTitle("gitlab.Server", title)
+            gl_url = items[0].getProperty("url").rstrip("/")
+            gl_token = items[0].getProperty("token")
+
+        ssl_ctx = ssl.create_default_context()
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = ssl.CERT_NONE
+
+        def read_file(project, path, ref):
+            url = "%s/api/v4/projects/%s/repository/files/%s?ref=%s" % (
+                gl_url, quote(project, safe=""),
+                quote(path, safe=""), quote(ref, safe="")
+            )
+            req = Request(url)
+            req.add_header("PRIVATE-TOKEN", gl_token)
+            resp = urlopen(req, context=ssl_ctx, timeout=30)
+            data = json.loads(resp.read().decode("utf-8"))
+            c = data.get("content", "")
+            e = data.get("encoding", "base64")
+            return base64.b64decode(c).decode("utf-8") if e == "base64" else c
+
+        scope = {
+            "releaseVariables": releaseVariables,
+            "configurationApi": configurationApi,
+            "release": release
+        }
+        exec(releaseVariables["commonLibPy"], scope)
+
+        # Deploy
+        task_code = read_file(
+            releaseVariables["automationProject"],
+            "scripts/tasks/build_argocd_payload.py",
+            releaseVariables["automationRef"]
+        )
+        exec(task_code, scope)
+        result = scope["run_in_dai"](releaseVariables, configurationApi)
+        if result:
+            for k, v in result.items():
+                releaseVariables[k] = json.dumps(v) if isinstance(v, (dict, list)) else ("" if v is None else str(v))
+
+        # Wait
+        task_code = read_file(
+            releaseVariables["automationProject"],
+            "scripts/tasks/wait_sync.py",
+            releaseVariables["automationRef"]
+        )
+        exec(task_code, scope)
+        result = scope["run_in_dai"](releaseVariables, configurationApi)
+        if result:
+            for k, v in result.items():
+                releaseVariables[k] = json.dumps(v) if isinstance(v, (dict, list)) else ("" if v is None else str(v))
+
+  # ============================================================
+  # PHASE 6 : Rapport
+  # ============================================================
+  - phase: "6 - Rapport"
+    tasks:
+
+    - name: "6.1 - Generer le rapport"
+      type: xlrelease.ScriptTask
+      script: |
+        import json
+        import base64
+        import ssl
+        try:
+            from urllib2 import Request, urlopen, HTTPError
+            from urllib import quote
+        except ImportError:
+            from urllib.request import Request, urlopen
+            from urllib.error import HTTPError
+            from urllib.parse import quote
+
+        gl_server = releaseVariables.get("gitlabServer")
+        try:
+            gl_url = gl_server.getProperty("url").rstrip("/")
+            gl_token = gl_server.getProperty("token")
+        except:
+            title = str(gl_server)
+            items = configurationApi.searchByTypeAndTitle("gitlab.Server", title)
+            gl_url = items[0].getProperty("url").rstrip("/")
+            gl_token = items[0].getProperty("token")
+
+        ssl_ctx = ssl.create_default_context()
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = ssl.CERT_NONE
+
+        def read_file(project, path, ref):
+            url = "%s/api/v4/projects/%s/repository/files/%s?ref=%s" % (
+                gl_url, quote(project, safe=""),
+                quote(path, safe=""), quote(ref, safe="")
+            )
+            req = Request(url)
+            req.add_header("PRIVATE-TOKEN", gl_token)
+            resp = urlopen(req, context=ssl_ctx, timeout=30)
+            data = json.loads(resp.read().decode("utf-8"))
+            c = data.get("content", "")
+            e = data.get("encoding", "base64")
+            return base64.b64decode(c).decode("utf-8") if e == "base64" else c
+
+        scope = {
+            "releaseVariables": releaseVariables,
+            "configurationApi": configurationApi,
+            "release": release
+        }
+        exec(releaseVariables["commonLibPy"], scope)
+
+        task_code = read_file(
+            releaseVariables["automationProject"],
+            "scripts/tasks/report.py",
+            releaseVariables["automationRef"]
+        )
+        exec(task_code, scope)
+        result = scope["run_in_dai"](releaseVariables, configurationApi)
+        if result:
+            for k, v in result.items():
+                releaseVariables[k] = json.dumps(v) if isinstance(v, (dict, list)) else ("" if v is None else str(v))
+
+    - name: "6.2 - Verifier resultat"
+      type: xlrelease.ScriptTask
+      script: |
+        success = releaseVariables.get("overallSuccess", "false")
+        report = releaseVariables.get("deploymentReport", "")
+        print("")
+        print("=" * 60)
+        print(report)
+        print("=" * 60)
+        if success != "true":
+            raise Exception("Deploiement echoue. Voir rapport.")
+
+  # ============================================================
+  # PHASE 7 : Rollback
+  # ============================================================
+  - phase: "7 - Rollback"
+    tasks:
+
+    - name: "7.1 - Rollback necessaire ?"
+      type: xlrelease.UserInputTask
+      precondition: "releaseVariables['allHealthy'] == 'false'"
+      description: |
+        Echec detecte.
+
+        ${deploymentReport}
+
+        Voulez-vous rollback ?
+      variables:
+      - performRollback
+      - rollbackTag
+
+    - name: "7.2 - Executer rollback"
+      type: xlrelease.ScriptTask
+      precondition: "releaseVariables['performRollback'] == 'true'"
+      script: |
+        import json
+        import base64
+        import ssl
+        try:
+            from urllib2 import Request, urlopen, HTTPError
+            from urllib import quote
+        except ImportError:
+            from urllib.request import Request, urlopen
+            from urllib.error import HTTPError
+            from urllib.parse import quote
+
+        gl_server = releaseVariables.get("gitlabServer")
+        try:
+            gl_url = gl_server.getProperty("url").rstrip("/")
+            gl_token = gl_server.getProperty("token")
+        except:
+            title = str(gl_server)
+            items = configurationApi.searchByTypeAndTitle("gitlab.Server", title)
+            gl_url = items[0].getProperty("url").rstrip("/")
+            gl_token = items[0].getProperty("token")
+
+        ssl_ctx = ssl.create_default_context()
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = ssl.CERT_NONE
+
+        def read_file(project, path, ref):
+            url = "%s/api/v4/projects/%s/repository/files/%s?ref=%s" % (
+                gl_url, quote(project, safe=""),
+                quote(path, safe=""), quote(ref, safe="")
+            )
+            req = Request(url)
+            req.add_header("PRIVATE-TOKEN", gl_token)
+            resp = urlopen(req, context=ssl_ctx, timeout=30)
+            data = json.loads(resp.read().decode("utf-8"))
+            c = data.get("content", "")
+            e = data.get("encoding", "base64")
+            return base64.b64decode(c).decode("utf-8") if e == "base64" else c
+
+        scope = {
+            "releaseVariables": releaseVariables,
+            "configurationApi": configurationApi,
+            "release": release
+        }
+        exec(releaseVariables["commonLibPy"], scope)
+
+        task_code = read_file(
+            releaseVariables["automationProject"],
+            "scripts/tasks/rollback.py",
+            releaseVariables["automationRef"]
+        )
+        exec(task_code, scope)
+        result = scope["run_in_dai"](releaseVariables, configurationApi)
+        if result:
+            for k, v in result.items():
+                releaseVariables[k] = json.dumps(v) if isinstance(v, (dict, list)) else ("" if v is None else str(v))

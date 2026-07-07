@@ -1,103 +1,96 @@
-# =============================================================
-# rollback.py
-# Rollback d'un deploiement ArgoCD
-# =============================================================
-
 def run_in_dai(releaseVariables, configurationApi):
 
     log_section("ROLLBACK")
 
-    perform = get_var(
-        releaseVariables, "performRollback", "false"
-    ) == "true"
-
-    if not perform:
+    perform = get_var(releaseVariables, "performRollback", "false")
+    if perform != "true":
         log_info("Rollback non demande - skip")
         return {"rollbackStatus": "skipped"}
 
-    component = json_load_var(releaseVariables, "componentConfigJson")
-    env_configs = json_load_var(
-        releaseVariables, "selectedEnvConfigsJson"
-    )
+    component   = json_load_var(releaseVariables, "componentConfigJson")
+    env_configs = json_load_var(releaseVariables, "selectedEnvConfigsJson")
     rollback_tag = get_var(releaseVariables, "rollbackTag", "")
 
-    component_name = component.get("name")
-    rollback_results = []
+    comp_name = component.get("name")
+    results   = []
 
-    for env_cfg in env_configs:
-        env_name = env_cfg.get("name")
-        app_name = "%s-%s" % (component_name, env_name)
-        argocd_server = env_cfg.get("argocdServer")
+    for ec in env_configs:
+        env_name = ec.get("name")
+        app_name = "%s-%s" % (comp_name, env_name)
 
-        log_info("Rollback %s (tag: %s)..." % (app_name, rollback_tag))
+        log_info("Rollback %s ..." % app_name)
 
         try:
-            argocd = ArgoCDClient.from_dai(
-                configurationApi, argocd_server
+            argocd_url, argocd_token = get_argocd_credentials(
+                releaseVariables, configurationApi, ec
             )
 
             if rollback_tag:
-                # Rollback by tag: update helm parameter
-                app = argocd.http.get(
-                    "/applications/%s" % app_name
+                # Rollback par tag: modifier le parametre helm
+                app = argocd_request(
+                    argocd_url, argocd_token,
+                    "GET", "/applications/%s" % app_name
                 )
-                spec = app.get("spec", {})
+                spec   = app.get("spec", {})
                 source = spec.get("source", {})
-                helm = source.get("helm", {})
+                helm   = source.get("helm", {})
                 params = helm.get("parameters", [])
 
                 updated = False
-                for param in params:
-                    if param.get("name") == "image.tag":
-                        param["value"] = rollback_tag
+                for p in params:
+                    if p.get("name") == "image.tag":
+                        p["value"] = rollback_tag
                         updated = True
                         break
                 if not updated:
                     params.append({
-                        "name": "image.tag",
-                        "value": rollback_tag
+                        "name": "image.tag", "value": rollback_tag
                     })
 
                 helm["parameters"] = params
-                source["helm"] = helm
-                spec["source"] = source
-                app["spec"] = spec
+                source["helm"]     = helm
+                spec["source"]     = source
+                app["spec"]        = spec
 
-                argocd.http.put(
-                    "/applications/%s" % app_name, body=app
+                argocd_request(
+                    argocd_url, argocd_token,
+                    "PUT", "/applications/%s" % app_name, body=app
                 )
-                argocd.sync_app(app_name, prune=False)
+                argocd_sync(argocd_url, argocd_token, app_name)
 
+                log_ok("Rollback -> tag %s pour %s" % (
+                    rollback_tag, app_name
+                ))
             else:
-                # Rollback to previous ArgoCD revision
-                history = argocd.get_app_history(app_name)
+                # Rollback vers la revision precedente
+                history = argocd_get_history(
+                    argocd_url, argocd_token, app_name
+                )
                 if len(history) < 2:
-                    raise Exception(
-                        "Pas assez d'historique pour rollback"
-                    )
-                prev_revision_id = history[-2].get("id")
-                argocd.rollback_app(app_name, prev_revision_id)
+                    raise Exception("Pas assez d historique")
+                prev_id = history[-2].get("id")
+                argocd_request(
+                    argocd_url, argocd_token,
+                    "POST", "/applications/%s/rollback" % app_name,
+                    body={"id": prev_id}
+                )
+                log_ok("Rollback -> revision %s pour %s" % (
+                    prev_id, app_name
+                ))
 
-            log_ok("Rollback initie: %s" % app_name)
-            rollback_results.append({
-                "env": env_name,
-                "app": app_name,
-                "status": "rolled_back",
-                "rollback_tag": rollback_tag
+            results.append({
+                "env": env_name, "app": app_name,
+                "status": "rolled_back"
             })
 
         except Exception as e:
-            log_error(
-                "Erreur rollback %s: %s" % (app_name, str(e))
-            )
-            rollback_results.append({
-                "env": env_name,
-                "app": app_name,
-                "status": "error",
-                "error": str(e)
+            log_error("Erreur rollback %s: %s" % (app_name, str(e)))
+            results.append({
+                "env": env_name, "app": app_name,
+                "status": "error", "error": str(e)
             })
 
     return {
-        "rollbackResultsJson": rollback_results,
-        "rollbackStatus": "completed"
+        "rollbackResultsJson": results,
+        "rollbackStatus":      "completed"
     }

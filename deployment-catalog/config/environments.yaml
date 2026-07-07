@@ -1,14 +1,10 @@
-# Catalogue des environnements cibles
-# Repo: platform/deployment-catalog
-# Path: config/environments.yaml
-
 environments:
 
   - name: dev
     displayName: "Development"
-    description: "Environnement de développement"
+    description: "Environnement de developpement"
+    argocdServerVariable: "argocdDevServer"
     namespace_prefix: "dev"
-    argocdServer: "ArgoCD Dev"
     argocdProject: "dev-project"
     k8sCluster: "https://k8s-dev.company.com"
     k8sClusterName: "cluster-dev"
@@ -18,21 +14,12 @@ environments:
     approvalRequired: false
     deploymentOrder: 1
     notificationChannel: "#deploy-dev"
-    resourceQuota:
-      cpu: "4"
-      memory: "8Gi"
-    helmValuesExtra:
-      replicaCount: 1
-      resources:
-        limits:
-          cpu: "500m"
-          memory: "512Mi"
 
   - name: staging
     displayName: "Staging"
     description: "Environnement de pre-production"
+    argocdServerVariable: "argocdStagingServer"
     namespace_prefix: "staging"
-    argocdServer: "ArgoCD Staging"
     argocdProject: "staging-project"
     k8sCluster: "https://k8s-staging.company.com"
     k8sClusterName: "cluster-staging"
@@ -42,21 +29,12 @@ environments:
     approvalRequired: false
     deploymentOrder: 2
     notificationChannel: "#deploy-staging"
-    resourceQuota:
-      cpu: "8"
-      memory: "16Gi"
-    helmValuesExtra:
-      replicaCount: 2
-      resources:
-        limits:
-          cpu: "1000m"
-          memory: "1Gi"
 
   - name: prod
     displayName: "Production"
     description: "Environnement de production"
+    argocdServerVariable: "argocdProdServer"
     namespace_prefix: "prod"
-    argocdServer: "ArgoCD Prod"
     argocdProject: "prod-project"
     k8sCluster: "https://k8s-prod.company.com"
     k8sClusterName: "cluster-prod"
@@ -66,12 +44,3 @@ environments:
     approvalRequired: true
     deploymentOrder: 3
     notificationChannel: "#deploy-prod"
-    resourceQuota:
-      cpu: "32"
-      memory: "64Gi"
-    helmValuesExtra:
-      replicaCount: 3
-      resources:
-        limits:
-          cpu: "2000m"
-          memory: "2Gi"
